@@ -33,7 +33,7 @@ from typing import Dict, List, Optional
 import uuid
 
 # Configuration
-BASE_URL = "https://trainx.preview.emergentagent.com/api"
+BASE_URL = "https://data-import-hub-4.preview.emergentagent.com/api"
 
 # Test credentials from review request
 TEST_CREDENTIALS = {
