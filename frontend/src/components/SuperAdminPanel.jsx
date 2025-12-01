@@ -310,14 +310,22 @@ const SuperAdminPanel = () => {
     try {
       const { participant, sessionId } = checklistDialog;
       
+      // Validate: needs_repair items must have comments
+      for (let i = 0; i < checklistForm.items.length; i++) {
+        if (checklistForm.items[i].status === "needs_repair" && !checklistForm.items[i].comments.trim()) {
+          toast.error(`Please add repair details for: ${checklistForm.items[i].item}`);
+          return;
+        }
+      }
+      
       await axiosInstance.post("/super-admin/checklist/submit", {
         session_id: sessionId,
         participant_id: participant.id,
-        interval: checklistForm.interval,
         checklist_items: checklistForm.items.map(item => ({
           item: item.item,
           status: item.status,
-          image_url: item.image || ""
+          comments: item.comments,
+          photo_url: item.image || ""
         }))
       });
       
@@ -328,8 +336,7 @@ const SuperAdminPanel = () => {
       // Reset form but keep dialog open
       if (checklistTemplate) {
         setChecklistForm({
-          interval: "pre",
-          items: checklistTemplate.items.map(item => ({ item, status: "good", image: null }))
+          items: checklistTemplate.items.map(item => ({ item, status: "good", comments: "", image: null }))
         });
       }
     } catch (error) {
