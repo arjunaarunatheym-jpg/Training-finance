@@ -231,27 +231,14 @@ const SuperAdminPanel = () => {
     try {
       const { participant, sessionId } = checklistDialog;
       
-      // Get checklist template
-      const sessionRes = await axiosInstance.get(`/sessions/${sessionId}`);
-      const templatesRes = await axiosInstance.get("/checklist-templates");
-      const template = templatesRes.data.find(t => t.program_id === sessionRes.data.program_id);
-      
-      if (!template) {
-        toast.error("No checklist template found");
-        return;
-      }
-      
-      await axiosInstance.post("/vehicle-checklists", {
-        session_id: sessionId,
-        participant_id: participant.id,
-        checklist_template_id: template.id,
-        items: template.items.map((item, index) => ({
-          item: item,
-          checked: checklistForm.items[index] !== false
-        }))
+      await axiosInstance.post("/super-admin/checklist/submit", null, {
+        params: {
+          session_id: sessionId,
+          participant_id: participant.id
+        }
       });
       
-      toast.success("Checklist submitted");
+      toast.success("Checklist submitted (all items checked)");
       setChecklistDialog({ open: false, participant: null, sessionId: null });
       toggleSessionExpand(sessionId);
     } catch (error) {
