@@ -3651,7 +3651,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   );
 };
 
-// Super Admin Tab Component
+export default AdminDashboard;
 const SuperAdminTab = ({
   sessions,
   companies,
