@@ -3040,28 +3040,15 @@ async def super_admin_checklist_submit(
     return {"message": "Checklist submitted successfully"}
 
 @api_router.post("/super-admin/feedback/submit")
-async def super_admin_feedback_submit(session_id: str, participant_id: str, current_user: User = Depends(get_current_user)):
-    """Super admin submit feedback for participant with default responses"""
+async def super_admin_feedback_submit(
+    session_id: str,
+    participant_id: str,
+    responses: List[dict],
+    current_user: User = Depends(get_current_user)
+):
+    """Super admin submit feedback for participant with actual responses"""
     if current_user.email != "arjuna@mddrc.com.my":
         raise HTTPException(status_code=403, detail="Only super admin can submit feedback")
-    
-    # Get session and program
-    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Get feedback template
-    template = await db.feedback_templates.find_one({"program_id": session['program_id']}, {"_id": 0})
-    if not template:
-        raise HTTPException(status_code=404, detail="No feedback template found for this program")
-    
-    # Create default responses
-    responses = []
-    for question in template['questions']:
-        if question['type'] == 'rating':
-            responses.append({"question": question['question'], "response": "5"})
-        else:
-            responses.append({"question": question['question'], "response": "Good training"})
     
     feedback_obj = CourseFeedback(
         participant_id=participant_id,
