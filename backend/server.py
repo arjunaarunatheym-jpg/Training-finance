@@ -2919,6 +2919,17 @@ async def super_admin_submit_test(data: SuperAdminTestSubmit, current_user: User
     # Calculate correct answers from provided answers
     correct = 0
     for i, ans in enumerate(data.answers):
+        if i < len(questions):
+            submitted_answer = int(ans)
+            correct_answer = int(questions[i]['correct_answer'])
+            if submitted_answer == correct_answer:
+                correct += 1
+    
+    score = (correct / len(questions)) * 100 if questions else 0
+    passed = score >= pass_percentage
+    
+    result_obj = TestResult(
+        test_id=data.test_id,
         participant_id=data.participant_id,
         session_id=data.session_id,
         test_type=test_doc['test_type'],
