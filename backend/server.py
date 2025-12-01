@@ -2867,18 +2867,12 @@ async def update_test_result(result_id: str, score: float, passed: bool, current
     return {"message": "Test result updated successfully"}
 
 @api_router.post("/tests/super-admin-submit", response_model=TestResult)
-async def super_admin_submit_test(
-    test_id: str,
-    session_id: str,
-    participant_id: str,
-    answers: List[int],
-    current_user: User = Depends(get_current_user)
-):
+async def super_admin_submit_test(data: SuperAdminTestSubmit, current_user: User = Depends(get_current_user)):
     """Submit test on behalf of participant - Super Admin only"""
     if current_user.email != "arjuna@mddrc.com.my":
         raise HTTPException(status_code=403, detail="Only super admin can submit tests for participants")
     
-    test_doc = await db.tests.find_one({"id": test_id}, {"_id": 0})
+    test_doc = await db.tests.find_one({"id": data.test_id}, {"_id": 0})
     if not test_doc:
         raise HTTPException(status_code=404, detail="Test not found")
     
