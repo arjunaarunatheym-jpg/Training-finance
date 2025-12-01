@@ -252,22 +252,14 @@ const SuperAdminPanel = () => {
     try {
       const { participant, sessionId } = feedbackDialog;
       
-      // Get feedback template
-      const sessionRes = await axiosInstance.get(`/sessions/${sessionId}`);
-      const templatesRes = await axiosInstance.get(`/feedback-templates/program/${sessionRes.data.program_id}`);
-      
-      if (!templatesRes.data || !templatesRes.data.questions) {
-        toast.error("No feedback template found");
-        return;
-      }
-      
-      await axiosInstance.post("/feedback/submit", {
-        session_id: sessionId,
-        participant_id: participant.id,
-        responses: feedbackForm.responses
+      await axiosInstance.post("/super-admin/feedback/submit", null, {
+        params: {
+          session_id: sessionId,
+          participant_id: participant.id
+        }
       });
       
-      toast.success("Feedback submitted");
+      toast.success("Feedback submitted (default responses)");
       setFeedbackDialog({ open: false, participant: null, sessionId: null });
       toggleSessionExpand(sessionId);
     } catch (error) {
