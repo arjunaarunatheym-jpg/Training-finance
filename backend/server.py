@@ -2988,7 +2988,14 @@ async def super_admin_clock_out(session_id: str, participant_id: str, clock_out:
         raise HTTPException(status_code=404, detail="No clock-in record found")
 
 @api_router.post("/super-admin/vehicle-details")
-async def super_admin_vehicle_details(session_id: str, participant_id: str, vehicle_plate_number: str, vehicle_type: str, current_user: User = Depends(get_current_user)):
+async def super_admin_vehicle_details(
+    session_id: str,
+    participant_id: str,
+    vehicle_model: str,
+    registration_number: str,
+    roadtax_expiry: str,
+    current_user: User = Depends(get_current_user)
+):
     """Super admin submit vehicle details for participant"""
     if current_user.email != "arjuna@mddrc.com.my":
         raise HTTPException(status_code=403, detail="Only super admin can manage vehicle details")
@@ -2996,12 +3003,13 @@ async def super_admin_vehicle_details(session_id: str, participant_id: str, vehi
     vehicle_obj = VehicleDetails(
         participant_id=participant_id,
         session_id=session_id,
-        vehicle_plate_number=vehicle_plate_number,
-        vehicle_type=vehicle_type
+        vehicle_model=vehicle_model,
+        registration_number=registration_number,
+        roadtax_expiry=roadtax_expiry
     )
     
     doc = vehicle_obj.model_dump()
-    doc['submitted_at'] = doc['submitted_at'].isoformat()
+    doc['created_at'] = doc['created_at'].isoformat()
     await db.vehicle_details.insert_one(doc)
     
     return {"message": "Vehicle details saved successfully"}
