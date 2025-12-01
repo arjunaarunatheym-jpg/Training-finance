@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Clock, CheckCircle, XCircle, Edit, Car, ClipboardList, MessageSquare, FileText, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, CheckCircle, XCircle, Edit, Car, ClipboardList, MessageSquare, FileText, User, Upload, X } from "lucide-react";
 
 const SuperAdminPanel = () => {
   const [sessions, setSessions] = useState([]);
@@ -26,10 +27,12 @@ const SuperAdminPanel = () => {
 
   // Form states
   const [clockForm, setClockForm] = useState({ clockIn: "", clockOut: "" });
-  const [vehicleForm, setVehicleForm] = useState({ plateNumber: "", type: "" });
+  const [vehicleForm, setVehicleForm] = useState({ vehicle_model: "", registration_number: "", roadtax_expiry: "" });
   const [testForm, setTestForm] = useState({ score: "" });
-  const [checklistForm, setChecklistForm] = useState({ items: [] });
+  const [checklistForm, setChecklistForm] = useState({ interval: "pre", items: [], images: {} });
+  const [checklistTemplate, setChecklistTemplate] = useState(null);
   const [feedbackForm, setFeedbackForm] = useState({ responses: [] });
+  const [feedbackTemplate, setFeedbackTemplate] = useState(null);
 
   useEffect(() => {
     loadActiveSessions();
@@ -39,7 +42,6 @@ const SuperAdminPanel = () => {
     setLoading(true);
     try {
       const response = await axiosInstance.get("/sessions");
-      // Filter only active/upcoming sessions
       const today = new Date();
       const activeSessions = response.data.filter(s => {
         const endDate = new Date(s.end_date);
@@ -56,14 +58,11 @@ const SuperAdminPanel = () => {
 
   const toggleSessionExpand = async (sessionId) => {
     if (expandedSessions[sessionId]) {
-      // Collapse
       setExpandedSessions(prev => ({ ...prev, [sessionId]: null }));
     } else {
-      // Expand and load participants
       try {
         const response = await axiosInstance.get(`/sessions/${sessionId}/participants`);
         
-        // Enrich with status
         const enriched = await Promise.all(response.data.map(async (p) => {
           const participantUser = p.user || p;
           
@@ -140,7 +139,7 @@ const SuperAdminPanel = () => {
       
       toast.success("Attendance updated successfully");
       setClockInOutDialog({ open: false, participant: null, sessionId: null });
-      toggleSessionExpand(sessionId); // Refresh
+      toggleSessionExpand(sessionId);
     } catch (error) {
       toast.error("Failed to update attendance");
       console.error(error);
@@ -152,13 +151,17 @@ const SuperAdminPanel = () => {
     try {
       const { participant, sessionId } = vehicleDialog;
       
-      await axiosInstance.post("/super-admin/vehicle-details", null, {
-        params: {
-          session_id: sessionId,
-          participant_id: participant.id,
-          vehicle_plate_number: vehicleForm.plateNumber,
-          vehicle_type: vehicleForm.type
-        }
+      if (!vehicleForm.vehicle_model || !vehicleForm.registration_number || !vehicleForm.roadtax_expiry) {
+        toast.error("Please fill in all vehicle details");
+        return;
+      }
+      
+      await axiosInstance.post("/super-admin/vehicle-details", {
+        session_id: sessionId,
+        participant_id: participant.id,
+        vehicle_model: vehicleForm.vehicle_model,
+        registration_number: vehicleForm.registration_number,
+        roadtax_expiry: vehicleForm.roadtax_expiry
       });
       
       toast.success("Vehicle details saved");
@@ -170,7 +173,7 @@ const SuperAdminPanel = () => {
     }
   };
 
-  // Handle Test Submission with auto-generated answers
+  // Handle Test Submission
   const handleTestSubmit = async () => {
     try {
       const { participant, sessionId, testType } = testDialog;
@@ -181,7 +184,6 @@ const SuperAdminPanel = () => {
         return;
       }
       
-      // Get program and test details
       const sessionRes = await axiosInstance.get(`/sessions/${sessionId}`);
       const program = sessionRes.data;
       
@@ -193,22 +195,17 @@ const SuperAdminPanel = () => {
         return;
       }
       
-      // Auto-generate answers based on score
       const totalQuestions = test.questions.length;
       const correctAnswersNeeded = Math.round((score / 100) * totalQuestions);
       
-      // Create answers array: first N correct, rest wrong
       const answers = test.questions.map((q, index) => {
         if (index < correctAnswersNeeded) {
-          return q.correct_answer; // Correct
+          return q.correct_answer;
         } else {
-          // Wrong answer (pick any option that's not correct)
           const wrongOptions = [0, 1, 2, 3].filter(opt => opt !== q.correct_answer);
           return wrongOptions[0];
         }
       });
-      
-      const passed = score >= (program.pass_percentage || 70);
       
       await axiosInstance.post("/tests/super-admin-submit", {
         test_id: test.id,
@@ -226,19 +223,83 @@ const SuperAdminPanel = () => {
     }
   };
 
+  // Load Checklist Template
+  const loadChecklistTemplate = async (sessionId) => {
+    try {
+      const sessionRes = await axiosInstance.get(`/sessions/${sessionId}`);
+      const templatesRes = await axiosInstance.get("/checklist-templates");
+      const template = templatesRes.data.find(t => t.program_id === sessionRes.data.program_id);
+      
+      if (!template) {
+        toast.error("No checklist template found");
+        return null;
+      }
+      
+      return template;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  };
+
+  // Handle Checklist Dialog Open
+  const openChecklistDialog = async (participant, sessionId) => {
+    const template = await loadChecklistTemplate(sessionId);
+    if (template) {
+      setChecklistTemplate(template);
+      setChecklistForm({
+        interval: "pre",
+        items: template.items.map(item => ({ item, checked: false, image: null })),
+        images: {}
+      });
+      setChecklistDialog({ open: true, participant, sessionId });
+    }
+  };
+
+  // Handle Checklist Item Toggle
+  const toggleChecklistItem = (index) => {
+    setChecklistForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => 
+        i === index ? { ...item, checked: !item.checked } : item
+      )
+    }));
+  };
+
+  // Handle Checklist Image Upload
+  const handleChecklistImageUpload = (index, event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setChecklistForm(prev => ({
+          ...prev,
+          items: prev.items.map((item, i) => 
+            i === index ? { ...item, image: reader.result } : item
+          )
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Handle Checklist Submission
   const handleChecklistSubmit = async () => {
     try {
       const { participant, sessionId } = checklistDialog;
       
-      await axiosInstance.post("/super-admin/checklist/submit", null, {
-        params: {
-          session_id: sessionId,
-          participant_id: participant.id
-        }
+      await axiosInstance.post("/super-admin/checklist/submit", {
+        session_id: sessionId,
+        participant_id: participant.id,
+        interval: checklistForm.interval,
+        checklist_items: checklistForm.items.map(item => ({
+          item: item.item,
+          checked: item.checked,
+          image_url: item.image || ""
+        }))
       });
       
-      toast.success("Checklist submitted (all items checked)");
+      toast.success("Checklist submitted successfully");
       setChecklistDialog({ open: false, participant: null, sessionId: null });
       toggleSessionExpand(sessionId);
     } catch (error) {
@@ -247,19 +308,57 @@ const SuperAdminPanel = () => {
     }
   };
 
+  // Load Feedback Template
+  const loadFeedbackTemplate = async (sessionId) => {
+    try {
+      const sessionRes = await axiosInstance.get(`/sessions/${sessionId}`);
+      const templatesRes = await axiosInstance.get(`/feedback-templates/program/${sessionRes.data.program_id}`);
+      
+      if (!templatesRes.data || !templatesRes.data.questions) {
+        toast.error("No feedback template found");
+        return null;
+      }
+      
+      return templatesRes.data;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  };
+
+  // Handle Feedback Dialog Open
+  const openFeedbackDialog = async (participant, sessionId) => {
+    const template = await loadFeedbackTemplate(sessionId);
+    if (template) {
+      setFeedbackTemplate(template);
+      setFeedbackForm({
+        responses: template.questions.map(q => ({ question: q.question, response: "" }))
+      });
+      setFeedbackDialog({ open: true, participant, sessionId });
+    }
+  };
+
+  // Handle Feedback Response Change
+  const handleFeedbackResponseChange = (index, value) => {
+    setFeedbackForm(prev => ({
+      responses: prev.responses.map((r, i) => 
+        i === index ? { ...r, response: value } : r
+      )
+    }));
+  };
+
   // Handle Feedback Submission
   const handleFeedbackSubmit = async () => {
     try {
       const { participant, sessionId } = feedbackDialog;
       
-      await axiosInstance.post("/super-admin/feedback/submit", null, {
-        params: {
-          session_id: sessionId,
-          participant_id: participant.id
-        }
+      await axiosInstance.post("/super-admin/feedback/submit", {
+        session_id: sessionId,
+        participant_id: participant.id,
+        responses: feedbackForm.responses
       });
       
-      toast.success("Feedback submitted (default responses)");
+      toast.success("Feedback submitted successfully");
       setFeedbackDialog({ open: false, participant: null, sessionId: null });
       toggleSessionExpand(sessionId);
     } catch (error) {
@@ -291,7 +390,7 @@ const SuperAdminPanel = () => {
             🔐 Super Admin - Quick Testing Panel
           </CardTitle>
           <CardDescription className="text-purple-100">
-            Quickly fill in participant data for testing without logging into multiple portals. Shows only active sessions.
+            Fill in participant data exactly as they would in their portal. All data syncs across all portals.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -357,7 +456,6 @@ const SuperAdminPanel = () => {
 
                         {expandedParticipants[participant.id] && (
                           <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-0">
-                            {/* Clock In/Out */}
                             <Button
                               variant="outline"
                               size="sm"
@@ -371,13 +469,12 @@ const SuperAdminPanel = () => {
                               Clock In/Out
                             </Button>
 
-                            {/* Vehicle Details */}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
                                 setVehicleDialog({ open: true, participant, sessionId: session.id });
-                                setVehicleForm({ plateNumber: "", type: "" });
+                                setVehicleForm({ vehicle_model: "", registration_number: "", roadtax_expiry: "" });
                               }}
                               className="flex items-center gap-2"
                             >
@@ -385,7 +482,6 @@ const SuperAdminPanel = () => {
                               Vehicle
                             </Button>
 
-                            {/* Pre-Test */}
                             <Button
                               variant="outline"
                               size="sm"
@@ -399,7 +495,6 @@ const SuperAdminPanel = () => {
                               Pre-Test
                             </Button>
 
-                            {/* Post-Test */}
                             <Button
                               variant="outline"
                               size="sm"
@@ -413,28 +508,20 @@ const SuperAdminPanel = () => {
                               Post-Test
                             </Button>
 
-                            {/* Checklist */}
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setChecklistDialog({ open: true, participant, sessionId: session.id });
-                                setChecklistForm({ items: [] });
-                              }}
+                              onClick={() => openChecklistDialog(participant, session.id)}
                               className="flex items-center gap-2"
                             >
                               <ClipboardList className="w-4 h-4" />
                               Checklist
                             </Button>
 
-                            {/* Feedback */}
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setFeedbackDialog({ open: true, participant, sessionId: session.id });
-                                setFeedbackForm({ responses: [] });
-                              }}
+                              onClick={() => openFeedbackDialog(participant, session.id)}
                               className="flex items-center gap-2"
                             >
                               <MessageSquare className="w-4 h-4" />
@@ -453,7 +540,7 @@ const SuperAdminPanel = () => {
       )}
 
       {/* Clock In/Out Dialog */}
-      <Dialog open={clockInOutDialog.open} onOpenChange={(open) => setClockInOutDialog({ ...clockInOutDialog, open })}>
+      <Dialog open={clockInOutDialog.open} onOpenChange={(open) => setClockInOutDialog({ ...clockInOutDialog, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Clock In/Out - {clockInOutDialog.participant?.full_name}</DialogTitle>
@@ -483,35 +570,37 @@ const SuperAdminPanel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Vehicle Dialog */}
-      <Dialog open={vehicleDialog.open} onOpenChange={(open) => setVehicleDialog({ ...vehicleDialog, open })}>
+      {/* Vehicle Dialog - Same as Participant Portal */}
+      <Dialog open={vehicleDialog.open} onOpenChange={(open) => setVehicleDialog({ ...vehicleDialog, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Vehicle Details - {vehicleDialog.participant?.full_name}</DialogTitle>
-            <DialogDescription>Enter vehicle information</DialogDescription>
+            <DialogDescription>Enter vehicle information (same form as participant portal)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Vehicle Plate Number</Label>
+              <Label>Vehicle Model</Label>
               <Input
-                value={vehicleForm.plateNumber}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, plateNumber: e.target.value })}
+                value={vehicleForm.vehicle_model}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, vehicle_model: e.target.value })}
+                placeholder="Toyota Vios"
+              />
+            </div>
+            <div>
+              <Label>Registration Number (Plate Number)</Label>
+              <Input
+                value={vehicleForm.registration_number}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, registration_number: e.target.value })}
                 placeholder="ABC1234"
               />
             </div>
             <div>
-              <Label>Vehicle Type</Label>
-              <Select value={vehicleForm.type} onValueChange={(val) => setVehicleForm({ ...vehicleForm, type: val })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select vehicle type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="car">Car</SelectItem>
-                  <SelectItem value="motorcycle">Motorcycle</SelectItem>
-                  <SelectItem value="truck">Truck</SelectItem>
-                  <SelectItem value="van">Van</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Road Tax Expiry Date</Label>
+              <Input
+                type="date"
+                value={vehicleForm.roadtax_expiry}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, roadtax_expiry: e.target.value })}
+              />
             </div>
             <Button onClick={handleVehicleSubmit} className="w-full">
               Save Vehicle Details
@@ -521,14 +610,14 @@ const SuperAdminPanel = () => {
       </Dialog>
 
       {/* Test Dialog */}
-      <Dialog open={testDialog.open} onOpenChange={(open) => setTestDialog({ ...testDialog, open })}>
+      <Dialog open={testDialog.open} onOpenChange={(open) => setTestDialog({ ...testDialog, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {testDialog.testType === 'pre' ? 'Pre' : 'Post'}-Test - {testDialog.participant?.full_name}
             </DialogTitle>
             <DialogDescription>
-              Just enter the score (0-100). System will auto-generate correct/wrong answers.
+              Enter the score (0-100). System will auto-generate answers to match this score.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -553,31 +642,122 @@ const SuperAdminPanel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Checklist Dialog */}
-      <Dialog open={checklistDialog.open} onOpenChange={(open) => setChecklistDialog({ ...checklistDialog, open })}>
-        <DialogContent>
+      {/* Checklist Dialog - Same as Trainer Portal */}
+      <Dialog open={checklistDialog.open} onOpenChange={(open) => setChecklistDialog({ ...checklistDialog, open })} className="max-w-2xl">
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Checklist - {checklistDialog.participant?.full_name}</DialogTitle>
-            <DialogDescription>Mark checklist items (all items will be checked by default)</DialogDescription>
+            <DialogDescription>Check items and upload pictures (same as trainer portal)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">System will fetch the program's checklist template and mark all items as checked.</p>
+            <div>
+              <Label>Interval</Label>
+              <Select value={checklistForm.interval} onValueChange={(val) => setChecklistForm({ ...checklistForm, interval: val })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pre">Pre-Training</SelectItem>
+                  <SelectItem value="post">Post-Training</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-3">
+              {checklistForm.items.map((item, index) => (
+                <Card key={index} className="p-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={item.checked}
+                      onCheckedChange={() => toggleChecklistItem(index)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <Label className="text-sm font-normal">{item.item}</Label>
+                      <div className="mt-2">
+                        {item.image ? (
+                          <div className="relative inline-block">
+                            <img src={item.image} alt="Checklist" className="w-32 h-32 object-cover rounded" />
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="absolute top-1 right-1 h-6 w-6 p-0"
+                              onClick={() => {
+                                setChecklistForm(prev => ({
+                                  ...prev,
+                                  items: prev.items.map((it, i) => 
+                                    i === index ? { ...it, image: null } : it
+                                  )
+                                }));
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer">
+                            <div className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800">
+                              <Upload className="w-4 h-4" />
+                              Upload Picture
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleChecklistImageUpload(index, e)}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
             <Button onClick={handleChecklistSubmit} className="w-full">
-              Submit Checklist (All Checked)
+              Submit Checklist
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Feedback Dialog */}
-      <Dialog open={feedbackDialog.open} onOpenChange={(open) => setFeedbackDialog({ ...feedbackDialog, open })}>
-        <DialogContent>
+      {/* Feedback Dialog - Same as Participant Portal */}
+      <Dialog open={feedbackDialog.open} onOpenChange={(open) => setFeedbackDialog({ ...feedbackDialog, open })} className="max-w-2xl">
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Feedback - {feedbackDialog.participant?.full_name}</DialogTitle>
-            <DialogDescription>Submit feedback (system will use default responses)</DialogDescription>
+            <DialogDescription>Fill in feedback form (same as participant portal)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">System will fetch the feedback template and submit with default values.</p>
+            {feedbackTemplate?.questions.map((question, index) => (
+              <div key={index}>
+                <Label>{question.question}</Label>
+                {question.type === 'rating' ? (
+                  <Select 
+                    value={feedbackForm.responses[index]?.response} 
+                    onValueChange={(val) => handleFeedbackResponseChange(index, val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select rating" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">⭐ 1 Star</SelectItem>
+                      <SelectItem value="2">⭐⭐ 2 Stars</SelectItem>
+                      <SelectItem value="3">⭐⭐⭐ 3 Stars</SelectItem>
+                      <SelectItem value="4">⭐⭐⭐⭐ 4 Stars</SelectItem>
+                      <SelectItem value="5">⭐⭐⭐⭐⭐ 5 Stars</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Textarea
+                    value={feedbackForm.responses[index]?.response}
+                    onChange={(e) => handleFeedbackResponseChange(index, e.target.value)}
+                    placeholder="Enter your response..."
+                    rows={3}
+                  />
+                )}
+              </div>
+            ))}
             <Button onClick={handleFeedbackSubmit} className="w-full">
               Submit Feedback
             </Button>
