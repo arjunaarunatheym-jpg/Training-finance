@@ -2993,6 +2993,23 @@ class SuperAdminVehicleDetails(BaseModel):
     registration_number: str
     roadtax_expiry: str
 
+class SuperAdminChecklistSubmit(BaseModel):
+    session_id: str
+    participant_id: str
+    interval: str
+    checklist_items: List[dict]
+
+class SuperAdminFeedbackSubmit(BaseModel):
+    session_id: str
+    participant_id: str
+    responses: List[dict]
+
+class SuperAdminTestSubmit(BaseModel):
+    test_id: str
+    session_id: str
+    participant_id: str
+    answers: List[int]
+
 @api_router.post("/super-admin/vehicle-details")
 async def super_admin_vehicle_details(data: SuperAdminVehicleDetails, current_user: User = Depends(get_current_user)):
     """Super admin submit vehicle details for participant"""
