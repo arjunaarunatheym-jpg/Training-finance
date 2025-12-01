@@ -61,16 +61,6 @@ const AdminDashboard = ({ user, onLogout }) => {
   const [filteredTrainers, setFilteredTrainers] = useState([]);
   const [filteredAssistantAdmins, setFilteredAssistantAdmins] = useState([]);
   
-  // Super Admin states
-  const [superAdminSearchQuery, setSuperAdminSearchQuery] = useState("");
-  const [superAdminSearchType, setSuperAdminSearchType] = useState("session");
-  const [superAdminResults, setSuperAdminResults] = useState([]);
-  const [selectedSessionForSuperAdmin, setSelectedSessionForSuperAdmin] = useState(null);
-  const [superAdminParticipants, setSuperAdminParticipants] = useState([]);
-  const [editTestOpen, setEditTestOpen] = useState(false);
-  const [editingTest, setEditingTest] = useState(null);
-  const [testEditForm, setTestEditForm] = useState({ score: 0, passed: false });
-  
   // Checklist states
   const [checklistTemplates, setChecklistTemplates] = useState([]);
   const [checklistForm, setChecklistForm] = useState({ program_id: "", items: [""] });
