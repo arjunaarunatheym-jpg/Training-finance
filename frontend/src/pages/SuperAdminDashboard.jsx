@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { LogOut, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, AlertCircle, FileText } from "lucide-react";
+import { LogOut, Search, Edit, Trash2, Eye, CheckCircle, XCircle, Clock, AlertCircle, FileText, ClipboardList, MessageSquare } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 const SuperAdminDashboard = ({ user, onLogout }) => {
@@ -35,6 +36,17 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Test/Checklist/Feedback editing
+  const [editTestOpen, setEditTestOpen] = useState(false);
+  const [editingTest, setEditingTest] = useState(null);
+  const [testForm, setTestForm] = useState({ score: 0, passed: false });
+
+  const [editChecklistOpen, setEditChecklistOpen] = useState(false);
+  const [checklistForm, setChecklistForm] = useState({ items: [] });
+
+  const [editFeedbackOpen, setEditFeedbackOpen] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({ responses: [] });
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -108,24 +120,34 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
         try {
           // Get test results
           const testsRes = await axiosInstance.get(`/tests/results/participant/${participantUser.id}`);
-          const preTest = testsRes.data.find(t => t.test_type === "pre");
-          const postTest = testsRes.data.find(t => t.test_type === "post");
+          const sessionTests = testsRes.data.filter(t => t.session_id === session.id);
+          const preTest = sessionTests.find(t => t.test_type === "pre");
+          const postTest = sessionTests.find(t => t.test_type === "post");
           
           // Get checklist status
           const checklistRes = await axiosInstance.get(`/vehicle-checklists/${session.id}/${participantUser.id}`);
           
+          // Get feedback
+          const feedbackRes = await axiosInstance.get(`/feedback/session/${session.id}/participant/${participantUser.id}`).catch(() => ({ data: [] }));
+          
           return {
             ...participantUser,
-            preTest: preTest ? { completed: true, score: preTest.score, passed: preTest.passed } : { completed: false },
-            postTest: postTest ? { completed: true, score: postTest.score, passed: postTest.passed } : { completed: false },
-            checklistStatus: checklistRes.data?.length > 0 ? "completed" : "pending"
+            sessionId: session.id,
+            preTest: preTest ? { ...preTest, completed: true } : { completed: false },
+            postTest: postTest ? { ...postTest, completed: true } : { completed: false },
+            checklistStatus: checklistRes.data?.length > 0 ? "completed" : "pending",
+            checklistData: checklistRes.data || [],
+            feedbackData: feedbackRes.data || null
           };
         } catch (error) {
           return {
             ...participantUser,
+            sessionId: session.id,
             preTest: { completed: false },
             postTest: { completed: false },
-            checklistStatus: "pending"
+            checklistStatus: "pending",
+            checklistData: [],
+            feedbackData: null
           };
         }
       }));
@@ -155,7 +177,6 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
       toast.success("Participant updated successfully");
       setEditParticipantOpen(false);
       
-      // Refresh participants
       if (selectedSession) {
         handleSelectSession(selectedSession);
       }
@@ -172,12 +193,62 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
       setDeleteConfirmOpen(false);
       setDeleteTarget(null);
       
-      // Refresh participants
       if (selectedSession) {
         handleSelectSession(selectedSession);
       }
     } catch (error) {
       toast.error("Failed to delete participant");
+      console.error(error);
+    }
+  };
+
+  const handleEditTest = (participant, testType) => {
+    setEditingTest({ participant, testType });
+    const testData = testType === "pre" ? participant.preTest : participant.postTest;
+    setTestForm({
+      score: testData.score || 0,
+      passed: testData.passed || false
+    });
+    setEditTestOpen(true);
+  };
+
+  const handleSaveTest = async () => {
+    try {
+      const { participant, testType } = editingTest;
+      const testData = testType === "pre" ? participant.preTest : participant.postTest;
+      
+      if (testData.completed && testData.id) {
+        // Update existing test result
+        await axiosInstance.put(`/tests/results/${testData.id}`, {
+          score: parseFloat(testForm.score),
+          passed: testForm.passed
+        });
+      } else {
+        // Create new test result
+        const program = await axiosInstance.get(`/sessions/${participant.sessionId}`);
+        const tests = await axiosInstance.get(`/tests/program/${program.data.program_id}`);
+        const test = tests.data.find(t => t.test_type === testType);
+        
+        if (!test) {
+          toast.error(`No ${testType}-test found for this program`);
+          return;
+        }
+        
+        await axiosInstance.post("/tests/submit", {
+          test_id: test.id,
+          session_id: participant.sessionId,
+          participant_id: participant.id,
+          answers: Array(test.questions?.length || 0).fill(0),
+          score: parseFloat(testForm.score),
+          passed: testForm.passed
+        });
+      }
+      
+      toast.success(`${testType === 'pre' ? 'Pre' : 'Post'}-test updated successfully`);
+      setEditTestOpen(false);
+      handleSelectSession(selectedSession);
+    } catch (error) {
+      toast.error("Failed to update test");
       console.error(error);
     }
   };
@@ -195,7 +266,6 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -223,7 +293,6 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Section */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -268,7 +337,6 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
           </CardContent>
         </Card>
 
-        {/* Search Results */}
         {searchResults.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
@@ -305,7 +373,6 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
           </Card>
         )}
 
-        {/* Participants Details */}
         {selectedSession && (
           <Card>
             <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
@@ -334,14 +401,24 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
                               <p className="text-sm text-gray-600">Email: {participant.email}</p>
                             )}
                             
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                               <div>
                                 <Label className="text-xs">Pre-Test:</Label>
-                                <div className="mt-1">{getStatusBadge(participant.preTest)}</div>
+                                <div className="mt-1 flex gap-2 items-center">
+                                  {getStatusBadge(participant.preTest)}
+                                  <Button size="sm" variant="ghost" onClick={() => handleEditTest(participant, "pre")}>
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
                               <div>
                                 <Label className="text-xs">Post-Test:</Label>
-                                <div className="mt-1">{getStatusBadge(participant.postTest)}</div>
+                                <div className="mt-1 flex gap-2 items-center">
+                                  {getStatusBadge(participant.postTest)}
+                                  <Button size="sm" variant="ghost" onClick={() => handleEditTest(participant, "post")}>
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
                               <div>
                                 <Label className="text-xs">Checklist:</Label>
@@ -420,6 +497,43 @@ const SuperAdminDashboard = ({ user, onLogout }) => {
             </div>
             <Button onClick={handleSaveParticipant} className="w-full">
               Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Test Dialog */}
+      <Dialog open={editTestOpen} onOpenChange={setEditTestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editingTest?.testType === 'pre' ? 'Pre' : 'Post'}-Test Result</DialogTitle>
+            <DialogDescription>
+              Update test score and pass/fail status
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Score (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={testForm.score}
+                onChange={(e) => setTestForm({ ...testForm, score: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="passed"
+                checked={testForm.passed}
+                onChange={(e) => setTestForm({ ...testForm, passed: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="passed">Passed</Label>
+            </div>
+            <Button onClick={handleSaveTest} className="w-full">
+              Save Test Result
             </Button>
           </div>
         </DialogContent>
