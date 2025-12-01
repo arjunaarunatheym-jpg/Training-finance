@@ -3099,6 +3099,34 @@ const AdminDashboard = ({ user, onLogout }) => {
             <Settings />
           </TabsContent>
 
+          {/* Super Admin Tab - Only for arjuna@mddrc.com.my */}
+          {user.email === "arjuna@mddrc.com.my" && (
+            <TabsContent value="super-admin">
+              <SuperAdminTab
+                sessions={sessions}
+                companies={companies}
+                users={users.filter(u => u.role === "participant")}
+                superAdminSearchQuery={superAdminSearchQuery}
+                setSuperAdminSearchQuery={setSuperAdminSearchQuery}
+                superAdminSearchType={superAdminSearchType}
+                setSuperAdminSearchType={setSuperAdminSearchType}
+                superAdminResults={superAdminResults}
+                setSuperAdminResults={setSuperAdminResults}
+                selectedSessionForSuperAdmin={selectedSessionForSuperAdmin}
+                setSelectedSessionForSuperAdmin={setSelectedSessionForSuperAdmin}
+                superAdminParticipants={superAdminParticipants}
+                setSuperAdminParticipants={setSuperAdminParticipants}
+                editTestOpen={editTestOpen}
+                setEditTestOpen={setEditTestOpen}
+                editingTest={editingTest}
+                setEditingTest={setEditingTest}
+                testEditForm={testEditForm}
+                setTestEditForm={setTestEditForm}
+                loadData={loadData}
+              />
+            </TabsContent>
+          )}
+
           {/* Data Management Tab - Super Admin */}
           <TabsContent value="data-management">
             <DataManagement />
