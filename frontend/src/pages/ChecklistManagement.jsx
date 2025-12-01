@@ -39,7 +39,7 @@ const ChecklistManagement = ({ program }) => {
     }
 
     try {
-      await axiosInstance.post("/checklists/templates", {
+      await axiosInstance.post("/checklist-templates", {
         program_id: program.id,
         items: [newChecklistItem.trim()]
       });
