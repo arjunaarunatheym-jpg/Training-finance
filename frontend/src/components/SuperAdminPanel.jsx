@@ -119,18 +119,22 @@ const SuperAdminPanel = () => {
       const { participant, sessionId } = clockInOutDialog;
       
       if (clockForm.clockIn) {
-        await axiosInstance.post("/attendance/clock-in", {
-          session_id: sessionId,
-          participant_id: participant.id,
-          clock_in: new Date(clockForm.clockIn).toISOString()
+        await axiosInstance.post("/super-admin/attendance/clock-in", null, {
+          params: {
+            session_id: sessionId,
+            participant_id: participant.id,
+            clock_in: new Date(clockForm.clockIn).toISOString()
+          }
         });
       }
       
       if (clockForm.clockOut) {
-        await axiosInstance.post("/attendance/clock-out", {
-          session_id: sessionId,
-          participant_id: participant.id,
-          clock_out: new Date(clockForm.clockOut).toISOString()
+        await axiosInstance.post("/super-admin/attendance/clock-out", null, {
+          params: {
+            session_id: sessionId,
+            participant_id: participant.id,
+            clock_out: new Date(clockForm.clockOut).toISOString()
+          }
         });
       }
       
