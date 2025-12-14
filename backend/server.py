@@ -3101,7 +3101,33 @@ async def super_admin_feedback_submit(data: SuperAdminFeedbackSubmit, current_us
     
     doc = feedback_obj.model_dump()
     doc['submitted_at'] = doc['submitted_at'].isoformat()
-    await db.course_feedback.insert_one(doc)
+    
+    # Check if feedback already exists for this participant and session
+    existing = await db.course_feedback.find_one({
+        "participant_id": data.participant_id,
+        "session_id": data.session_id
+    })
+    
+    if existing:
+        # Update existing feedback
+        await db.course_feedback.update_one(
+            {"participant_id": data.participant_id, "session_id": data.session_id},
+            {"$set": {
+                "program_id": program_id,
+                "responses": data.responses,
+                "submitted_at": doc['submitted_at']
+            }}
+        )
+    else:
+        # Insert new feedback
+        await db.course_feedback.insert_one(doc)
+    
+    # Update participant_access to mark feedback as completed
+    await db.participant_access.update_one(
+        {"participant_id": data.participant_id, "session_id": data.session_id},
+        {"$set": {"feedback_completed": True}},
+        upsert=True
+    )
     
     return {"message": "Feedback submitted successfully"}
 
