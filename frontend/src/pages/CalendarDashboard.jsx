@@ -81,8 +81,11 @@ const CalendarDashboard = ({ user, onLogout }) => {
     const dateStr = `${year}-${month}-${day}`;
     
     return sessions.filter(session => {
-      // session.start_date is already in YYYY-MM-DD format from backend
-      return session.start_date === dateStr;
+      // Check if date falls within session's start_date and end_date range
+      const startDate = session.start_date;
+      const endDate = session.end_date || session.start_date; // If no end_date, use start_date
+      
+      return dateStr >= startDate && dateStr <= endDate;
     });
   };
 
