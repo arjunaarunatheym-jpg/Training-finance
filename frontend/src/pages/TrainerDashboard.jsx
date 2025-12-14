@@ -109,7 +109,7 @@ const TrainerDashboard = ({ user, onLogout }) => {
   const loadSessionParticipants = async (sessionId) => {
     try {
       // Get assigned participants for this trainer (auto-distributed equally)
-      const response = await axiosInstance.get(`/sessions/${sessionId}/assigned-participants`);
+      const response = await axiosInstance.get(`/trainer-checklist/${sessionId}/assigned-participants`);
       const participants = response.data;
       
       // Load checklists for this session to check completion status
