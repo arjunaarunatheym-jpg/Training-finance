@@ -339,33 +339,33 @@ const TrainerDashboard = ({ user, onLogout }) => {
       }}
     >
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             {logoUrl && (
               <button
                 onClick={() => navigate('/calendar')}
-                className="hover:opacity-80 transition-opacity cursor-pointer"
+                className="hover:opacity-80 transition-opacity cursor-pointer flex-shrink-0"
               >
                 <img 
                   src={logoUrl} 
                   alt={companyName}
-                  className="h-10 w-auto object-contain"
+                  className="h-8 sm:h-10 w-auto object-contain"
                 />
               </button>
             )}
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Trainer Portal</h1>
-              <p className="text-sm text-gray-600">Welcome, {user.full_name}</p>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Trainer Portal</h1>
+              <p className="text-xs sm:text-sm text-gray-600 truncate">Welcome, {user.full_name}</p>
             </div>
           </div>
           <Button
             data-testid="trainer-logout-button"
             onClick={onLogout}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-1 sm:gap-2 text-sm sm:text-base flex-shrink-0"
           >
-            <LogOut className="w-4 h-4" />
-            Logout
+            <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
       </header>
