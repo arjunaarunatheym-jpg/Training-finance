@@ -1488,9 +1488,18 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
                           {attendance.slice(0, 10).map((record, idx) => {
                             const formatTime = (timeStr) => {
                               if (!timeStr) return '-';
+                              // Time is already in HH:MM:SS format from backend
                               try {
-                                const date = new Date(timeStr);
-                                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                // If it's already in HH:MM:SS format, just format it nicely
+                                const parts = timeStr.split(':');
+                                if (parts.length >= 2) {
+                                  const hour = parseInt(parts[0]);
+                                  const minute = parts[1];
+                                  const ampm = hour >= 12 ? 'PM' : 'AM';
+                                  const displayHour = hour % 12 || 12;
+                                  return `${displayHour}:${minute} ${ampm}`;
+                                }
+                                return timeStr;
                               } catch {
                                 return timeStr;
                               }
@@ -1503,9 +1512,9 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
                                   <p className="text-xs text-gray-600">{new Date(record.date).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-sm">
-                                  <span className="text-green-600 font-medium">In: {formatTime(record.clock_in_time)}</span>
+                                  <span className="text-green-600 font-medium">In: {formatTime(record.clock_in)}</span>
                                   <span className="mx-2">|</span>
-                                  <span className="text-red-600 font-medium">Out: {formatTime(record.clock_out_time)}</span>
+                                  <span className="text-red-600 font-medium">Out: {formatTime(record.clock_out)}</span>
                                 </div>
                               </div>
                             );
