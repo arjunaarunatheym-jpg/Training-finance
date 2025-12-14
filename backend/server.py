@@ -3073,7 +3073,30 @@ async def super_admin_checklist_submit(data: SuperAdminChecklistSubmit, current_
     
     doc = checklist_obj.model_dump()
     doc['submitted_at'] = doc['submitted_at'].isoformat()
-    await db.vehicle_checklists.insert_one(doc)
+    
+    # Check if checklist already exists for this participant, session, and interval
+    existing = await db.vehicle_checklists.find_one({
+        "participant_id": data.participant_id,
+        "session_id": data.session_id,
+        "interval": "final"
+    })
+    
+    if existing:
+        # Update existing checklist
+        await db.vehicle_checklists.update_one(
+            {
+                "participant_id": data.participant_id,
+                "session_id": data.session_id,
+                "interval": "final"
+            },
+            {"$set": {
+                "checklist_items": data.checklist_items,
+                "submitted_at": doc['submitted_at']
+            }}
+        )
+    else:
+        # Insert new checklist
+        await db.vehicle_checklists.insert_one(doc)
     
     return {"message": "Checklist submitted successfully"}
 
