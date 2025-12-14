@@ -3185,6 +3185,17 @@ async def get_checklist_template(program_id: str, current_user: User = Depends(g
         template['created_at'] = datetime.fromisoformat(template['created_at'])
     return ChecklistTemplate(**template)
 
+@api_router.get("/checklists/templates/program/{program_id}", response_model=ChecklistTemplate)
+async def get_checklist_template_alias(program_id: str, current_user: User = Depends(get_current_user)):
+    """Alias endpoint for backward compatibility - trainers use this"""
+    template = await db.checklist_templates.find_one({"program_id": program_id}, {"_id": 0})
+    if not template:
+        return ChecklistTemplate(program_id=program_id, items=[])
+    
+    if isinstance(template.get('created_at'), str):
+        template['created_at'] = datetime.fromisoformat(template['created_at'])
+    return ChecklistTemplate(**template)
+
 @api_router.put("/checklist-templates/{template_id}", response_model=ChecklistTemplate)
 async def update_checklist_template(template_id: str, template_data: ChecklistTemplateCreate, current_user: User = Depends(get_current_user)):
     """Update a checklist template"""
