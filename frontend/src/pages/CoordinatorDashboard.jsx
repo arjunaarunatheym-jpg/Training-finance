@@ -301,7 +301,7 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
           console.error("Failed to load attendance:", err);
           return { data: [] };
         }),
-        axiosInstance.get(`/tests/session/${sessionId}/results`).catch(err => {
+        axiosInstance.get(`/tests/results/session/${sessionId}`).catch(err => {
           console.error("Failed to load test results:", err);
           return { data: [] };
         }),
