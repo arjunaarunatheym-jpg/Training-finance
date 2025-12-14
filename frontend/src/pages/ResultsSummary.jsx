@@ -60,20 +60,21 @@ const ResultsSummary = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Button
             variant="outline"
             onClick={() => navigate(-1)}
             data-testid="back-button"
+            className="mb-3 sm:mb-0"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900 mt-4">{summary.session_name}</h1>
-          <p className="text-gray-600">Results Summary - {summary.participants.length} Participants</p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mt-3 sm:mt-4">{summary.session_name}</h1>
+          <p className="text-sm sm:text-base text-gray-600">Results Summary - {summary.participants.length} Participants</p>
         </div>
 
         {/* Summary Stats */}
