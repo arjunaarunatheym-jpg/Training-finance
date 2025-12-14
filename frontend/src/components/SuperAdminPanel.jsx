@@ -145,11 +145,12 @@ const SuperAdminPanel = () => {
       
       toast.success("Attendance updated successfully");
       
-      // Refresh participant data but keep dialog open
+      // Refresh participant data
       await refreshParticipant(sessionId, participant.id);
       
-      // Clear form but keep dialog open
+      // Clear form and close dialog after successful submission
       setClockForm({ clockIn: "", clockOut: "" });
+      setClockInOutDialog({ open: false, participant: null, sessionId: null });
     } catch (error) {
       toast.error("Failed to update attendance");
       console.error(error);
