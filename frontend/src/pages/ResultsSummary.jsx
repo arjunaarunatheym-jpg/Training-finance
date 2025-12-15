@@ -35,7 +35,21 @@ const ResultsSummary = () => {
       const response = await axiosInstance.get(`/tests/results/${resultId}`);
       setDetailedResult(response.data);
     } catch (error) {
+      console.error("Failed to load detailed result:", error);
       toast.error("Failed to load detailed result");
+    }
+  };
+
+  const loadFeedbackDetails = async (participantId) => {
+    try {
+      const response = await axiosInstance.get(`/feedback/session/${sessionId}`);
+      const participantFeedback = response.data.find(f => f.participant_id === participantId);
+      if (participantFeedback) {
+        setDetailedResult(participantFeedback);
+      }
+    } catch (error) {
+      console.error("Failed to load feedback:", error);
+      toast.error("Failed to load feedback");
     }
   };
 
