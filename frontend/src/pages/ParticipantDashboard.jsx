@@ -29,6 +29,16 @@ const ParticipantDashboard = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadData();
+    
+    // Check if returning from feedback submission
+    const justSubmittedFeedback = sessionStorage.getItem('feedbackSubmitted');
+    if (justSubmittedFeedback) {
+      sessionStorage.removeItem('feedbackSubmitted');
+      // Force reload to get updated feedback status
+      setTimeout(() => {
+        loadData();
+      }, 500);
+    }
   }, []);
 
   const loadData = async () => {
