@@ -5461,6 +5461,15 @@ async def submit_feedback(feedback_data: FeedbackSubmit, current_user: User = De
     if current_user.role != "participant":
         raise HTTPException(status_code=403, detail="Only participants can submit feedback")
     
+    # Check if feedback already exists for this participant and session
+    existing_feedback = await db.course_feedback.find_one({
+        "participant_id": current_user.id,
+        "session_id": feedback_data.session_id
+    })
+    
+    if existing_feedback:
+        raise HTTPException(status_code=400, detail="You have already submitted feedback for this session")
+    
     feedback_obj = CourseFeedback(
         participant_id=current_user.id,
         session_id=feedback_data.session_id,
