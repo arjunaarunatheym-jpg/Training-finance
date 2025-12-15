@@ -170,7 +170,7 @@ const CalendarDashboard = ({ user, onLogout }) => {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => {
-                if (user.role === "admin") navigate("/admin");
+                if (user.email === "arjuna@mddrc.com.my" || user.role === "admin") navigate("/admin");
                 else if (user.role === "assistant_admin") navigate("/assistant-admin");
                 else if (user.role === "coordinator") navigate("/coordinator");
                 else if (user.role === "trainer") navigate("/trainer");
