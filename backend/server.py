@@ -3076,13 +3076,13 @@ async def super_admin_checklist_submit(data: SuperAdminChecklistSubmit, current_
         interval="trainer_inspection",  # Use same interval as trainer for consistency
         checklist_items=data.checklist_items,
         verified_by="super_admin",
+        verified_at=datetime.now(timezone.utc),
         verification_status="completed"
     )
     
     doc = checklist_obj.model_dump()
     doc['submitted_at'] = doc['submitted_at'].isoformat()
-    if doc.get('verified_at'):
-        doc['verified_at'] = doc['verified_at'].isoformat()
+    doc['verified_at'] = doc['verified_at'].isoformat()
     
     # Use upsert to prevent duplicates - same as trainer endpoint
     await db.vehicle_checklists.update_one(
