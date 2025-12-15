@@ -304,13 +304,14 @@ const TrainerChecklist = ({ user }) => {
 
         {/* Checklist Items */}
         <div className="space-y-4">
-          {checklistItems.map((item, index) => (
-            <Card key={index}>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-lg font-semibold">{item.item}</Label>
-                  </div>
+          {checklistItems && checklistItems.length > 0 ? (
+            checklistItems.map((item, index) => (
+              <Card key={index}>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-lg font-semibold">{item?.item || 'Checklist Item'}</Label>
+                    </div>
                   
                   <div>
                     <Label>Status</Label>
