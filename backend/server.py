@@ -5136,7 +5136,15 @@ async def submit_trainer_checklist(checklist_data: TrainerChecklistSubmit, curre
     doc['submitted_at'] = doc['submitted_at'].isoformat()
     doc['verified_at'] = doc['verified_at'].isoformat()
     
-    await db.vehicle_checklists.insert_one(doc)
+    # Use upsert to prevent duplicate checklists for the same participant/session
+    await db.vehicle_checklists.update_one(
+        {
+            "participant_id": checklist_data.participant_id,
+            "session_id": checklist_data.session_id
+        },
+        {"$set": doc},
+        upsert=True
+    )
     
     # If chief trainer submitted comments, save to session
     if checklist_data.chief_trainer_comments:
