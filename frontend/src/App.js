@@ -90,7 +90,7 @@ function App() {
             element={
               user ? (
                 user.email === "arjuna@mddrc.com.my" ? (
-                  <Navigate to="/super-admin" replace />
+                  <Navigate to="/admin" replace />
                 ) : user.role === "participant" ? (
                   <Navigate to="/participant" replace />
                 ) : user.role === "supervisor" || user.role === "pic_supervisor" ? (
