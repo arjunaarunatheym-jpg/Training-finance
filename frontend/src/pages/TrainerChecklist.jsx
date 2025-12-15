@@ -92,9 +92,9 @@ const TrainerChecklist = ({ user }) => {
         console.log('No existing checklist found, creating new one');
         
         // Initialize checklist items from template
-        if (template.items && template.items.length > 0) {
+        if (template && template.items && template.items.length > 0) {
           const items = template.items.map(item => ({
-            item: item,
+            item: typeof item === 'string' ? item : item.item || item.name || 'Item',
             status: "good",
             comments: "",
             photo_url: null
@@ -102,7 +102,9 @@ const TrainerChecklist = ({ user }) => {
           console.log('Initialized checklist items:', items);
           setChecklistItems(items);
         } else {
+          console.error('Template or items missing:', template);
           toast.error("No checklist items in template");
+          setChecklistItems([]); // Set empty array to prevent undefined error
         }
       }
       
