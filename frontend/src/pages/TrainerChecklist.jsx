@@ -125,6 +125,7 @@ const TrainerChecklist = ({ user }) => {
         ? error.response.data.detail 
         : error.response?.data?.message || error.message || "Failed to load checklist data";
       toast.error(errorMessage);
+      setChecklistItems([]); // Ensure checklistItems is initialized even on error
       setLoading(false);
     }
   };
