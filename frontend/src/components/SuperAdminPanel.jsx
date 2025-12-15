@@ -427,9 +427,37 @@ const SuperAdminPanel = () => {
     const template = await loadFeedbackTemplate(sessionId);
     if (template) {
       setFeedbackTemplate(template);
-      setFeedbackForm({
-        responses: template.questions.map(q => ({ question: q.question, response: "" }))
-      });
+      
+      // Check if feedback already exists for this participant
+      try {
+        const feedbackRes = await axiosInstance.get(`/feedback/session/${sessionId}`);
+        const existingFeedback = feedbackRes.data.find(f => f.participant_id === participant.id);
+        
+        if (existingFeedback && existingFeedback.responses) {
+          // Pre-fill form with existing feedback responses
+          setFeedbackForm({
+            responses: template.questions.map(q => {
+              const existingResponse = existingFeedback.responses.find(r => r.question === q.question);
+              return {
+                question: q.question,
+                response: existingResponse ? existingResponse.response : ""
+              };
+            })
+          });
+          toast.info("Editing existing feedback", { duration: 2000 });
+        } else {
+          // No existing feedback, create fresh form from template
+          setFeedbackForm({
+            responses: template.questions.map(q => ({ question: q.question, response: "" }))
+          });
+        }
+      } catch (error) {
+        // No existing feedback found, create fresh form from template
+        setFeedbackForm({
+          responses: template.questions.map(q => ({ question: q.question, response: "" }))
+        });
+      }
+      
       setFeedbackDialog({ open: true, participant, sessionId });
     }
   };
