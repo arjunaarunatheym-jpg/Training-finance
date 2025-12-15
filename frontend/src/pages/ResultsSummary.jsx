@@ -42,12 +42,28 @@ const ResultsSummary = () => {
   const handleToggleExpand = (participant) => {
     if (expandedParticipant === participant.participant.id) {
       setExpandedParticipant(null);
+      setExpandedSection(null);
       setDetailedResult(null);
     } else {
       setExpandedParticipant(participant.participant.id);
-      // Load detailed results if available
-      if (participant.pre_test.result_id) {
+      setExpandedSection(null); // Reset section when changing participant
+      setDetailedResult(null);
+    }
+  };
+
+  const handleToggleSection = (participant, section) => {
+    if (expandedSection === section) {
+      setExpandedSection(null);
+      setDetailedResult(null);
+    } else {
+      setExpandedSection(section);
+      // Load the appropriate data based on section
+      if (section === 'pre-test' && participant.pre_test?.result_id) {
         loadDetailedResult(participant.pre_test.result_id);
+      } else if (section === 'post-test' && participant.post_test?.result_id) {
+        loadDetailedResult(participant.post_test.result_id);
+      } else if (section === 'feedback' && participant.feedback_submitted) {
+        loadFeedbackDetails(participant.participant.id);
       }
     }
   };
