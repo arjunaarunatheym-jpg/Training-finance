@@ -3069,40 +3069,30 @@ async def super_admin_checklist_submit(data: SuperAdminChecklistSubmit, current_
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # For Super Admin, use "final" as interval (post-training checklist)
+    # For Super Admin, use standardized interval to match trainer submissions
     checklist_obj = VehicleChecklist(
         participant_id=data.participant_id,
         session_id=data.session_id,
-        interval="final",
-        checklist_items=data.checklist_items
+        interval="trainer_inspection",  # Use same interval as trainer for consistency
+        checklist_items=data.checklist_items,
+        verified_by="super_admin",
+        verification_status="completed"
     )
     
     doc = checklist_obj.model_dump()
     doc['submitted_at'] = doc['submitted_at'].isoformat()
+    if doc.get('verified_at'):
+        doc['verified_at'] = doc['verified_at'].isoformat()
     
-    # Check if checklist already exists for this participant, session, and interval
-    existing = await db.vehicle_checklists.find_one({
-        "participant_id": data.participant_id,
-        "session_id": data.session_id,
-        "interval": "final"
-    })
-    
-    if existing:
-        # Update existing checklist
-        await db.vehicle_checklists.update_one(
-            {
-                "participant_id": data.participant_id,
-                "session_id": data.session_id,
-                "interval": "final"
-            },
-            {"$set": {
-                "checklist_items": data.checklist_items,
-                "submitted_at": doc['submitted_at']
-            }}
-        )
-    else:
-        # Insert new checklist
-        await db.vehicle_checklists.insert_one(doc)
+    # Use upsert to prevent duplicates - same as trainer endpoint
+    await db.vehicle_checklists.update_one(
+        {
+            "participant_id": data.participant_id,
+            "session_id": data.session_id
+        },
+        {"$set": doc},
+        upsert=True
+    )
     
     return {"message": "Checklist submitted successfully"}
 
