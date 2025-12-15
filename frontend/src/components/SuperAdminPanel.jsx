@@ -291,9 +291,36 @@ const SuperAdminPanel = () => {
     const template = await loadChecklistTemplate(sessionId);
     if (template) {
       setChecklistTemplate(template);
-      setChecklistForm({
-        items: template.items.map(item => ({ item, status: "good", comments: "", image: null }))
-      });
+      
+      // Check if checklist already exists for this participant
+      try {
+        const existingRes = await axiosInstance.get(`/vehicle-checklists/${sessionId}/${participant.id}`);
+        const existingChecklist = existingRes.data;
+        
+        if (existingChecklist && existingChecklist.checklist_items) {
+          // Pre-fill form with existing data for editing
+          setChecklistForm({
+            items: existingChecklist.checklist_items.map(item => ({
+              item: item.item,
+              status: item.status || "good",
+              comments: item.comments || "",
+              image: item.photo_url || null
+            }))
+          });
+          toast.info("Editing existing checklist", { duration: 2000 });
+        } else {
+          // No existing checklist, create fresh form from template
+          setChecklistForm({
+            items: template.items.map(item => ({ item, status: "good", comments: "", image: null }))
+          });
+        }
+      } catch (error) {
+        // No existing checklist found, create fresh form from template
+        setChecklistForm({
+          items: template.items.map(item => ({ item, status: "good", comments: "", image: null }))
+        });
+      }
+      
       setChecklistDialog({ open: true, participant, sessionId });
     }
   };
