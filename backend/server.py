@@ -3094,6 +3094,16 @@ async def super_admin_checklist_submit(data: SuperAdminChecklistSubmit, current_
         upsert=True
     )
     
+    # Update participant_access to mark checklist as completed
+    await db.participant_access.update_one(
+        {
+            "participant_id": data.participant_id,
+            "session_id": data.session_id
+        },
+        {"$set": {"checklist_completed": True}},
+        upsert=True
+    )
+    
     return {"message": "Checklist submitted successfully"}
 
 @api_router.post("/super-admin/feedback/submit")
