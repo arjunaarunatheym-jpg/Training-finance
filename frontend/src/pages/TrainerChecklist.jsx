@@ -69,12 +69,21 @@ const TrainerChecklist = ({ user }) => {
       const templates = templateRes.data;
       if (!templates || templates.length === 0) {
         toast.error("No checklist template found for this program");
+        setChecklistItems([]); // Ensure checklistItems is initialized
         setLoading(false);
         return;
       }
       
       const template = templates[0];
       setTemplate(template);
+      
+      // Ensure template has items
+      if (!template.items || template.items.length === 0) {
+        toast.error("Checklist template has no items");
+        setChecklistItems([]);
+        setLoading(false);
+        return;
+      }
       
       // Check for existing checklist
       console.log('Checking for existing checklist...');
