@@ -183,16 +183,15 @@ const TrainerChecklist = ({ user }) => {
       
       setSubmitting(true);
       
-      const response = await axiosInstance.post('/checklists/submit', {
+      const response = await axiosInstance.post('/trainer-checklist/submit', {
         participant_id: participantId,
         session_id: sessionId,
-        checklist_items: checklistItems.map(item => ({
+        items: checklistItems.map(item => ({
           item: item.item,
           status: item.status,
-          comments: item.comments,
+          comments: item.comments || "",
           photo_url: item.photo_url
-        })),
-        photos: []
+        }))
       });
       
       // Mark as completed
