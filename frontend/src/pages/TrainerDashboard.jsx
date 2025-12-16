@@ -50,7 +50,9 @@ const TrainerDashboard = ({ user, onLogout }) => {
 
   const loadSessions = async () => {
     try {
-      const response = await axiosInstance.get("/sessions");
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await axiosInstance.get(`/sessions?_t=${timestamp}`);
       // Filter sessions where user is assigned as trainer
       const mySessions = response.data.filter(session => 
         session.trainer_assignments && session.trainer_assignments.some(t => t.trainer_id === user.id)
