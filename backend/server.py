@@ -1785,15 +1785,40 @@ async def delete_session(session_id: str, current_user: User = Depends(get_curre
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can delete sessions")
     
-    result = await db.sessions.delete_one({"id": session_id})
-    
-    if result.deleted_count == 0:
+    # Get session first to verify it exists
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Also delete related participant_access records
-    await db.participant_access.delete_many({"session_id": session_id})
+    # Delete ALL related data for this session
+    total_deleted = 0
     
-    return {"message": "Session deleted successfully"}
+    # Delete from all collections
+    collections_to_clean = [
+        "sessions",
+        "test_results",
+        "course_feedback",
+        "attendance",
+        "attendance_records",
+        "participant_attendance",
+        "vehicle_checklists",
+        "vehicle_details",
+        "certificates",
+        "participant_access",
+        "training_reports",
+        "chief_trainer_feedback",
+        "coordinator_feedback",
+    ]
+    
+    for collection_name in collections_to_clean:
+        result = await db[collection_name].delete_many({"session_id": session_id})
+        total_deleted += result.deleted_count
+    
+    return {
+        "message": "Session and all related data deleted successfully",
+        "session_name": session.get("name"),
+        "records_deleted": total_deleted
+    }
 
 # Participant Access Routes
 @api_router.post("/participant-access/update")
