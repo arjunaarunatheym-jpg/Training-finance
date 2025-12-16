@@ -134,19 +134,9 @@ const ParticipantDashboard = ({ user, onLogout }) => {
   };
   
   const handleRefreshStatus = async () => {
-    toast.info("Refreshing status...", { duration: 2000 });
-    try {
-      // Clear all state first
-      setParticipantAccess({});
-      setAttendanceToday({});
-      
-      // Reload fresh data
-      await loadData();
-      
-      toast.success("Status refreshed! Your feedback and certificate status are now up to date.", { duration: 4000 });
-    } catch (error) {
-      toast.error("Failed to refresh status");
-    }
+    toast.info("Refreshing...", { duration: 1000 });
+    // Force a hard reload to get completely fresh data
+    window.location.reload();
   };
 
   const handleDownloadCertificate = async (sessionId) => {
