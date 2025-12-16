@@ -70,30 +70,26 @@ const TrainerDashboard = ({ user, onLogout }) => {
         })
       );
       
-      // Filter sessions based on checklist completion and date
+      // Filter sessions based on 2-day visibility window after end date
       const now = new Date();
-      const todayStr = now.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+      const todayStr = now.toISOString().split('T')[0]; // Get YYYY-MM-DD format (e.g., "2025-12-19")
+      
       const activeSessions = sessionsWithParticipants.filter(session => {
-        // If no end date, show in active
+        // If no end date, always show
         if (!session.end_date) return true;
         
-        // Compare dates as strings to avoid timezone issues
-        const sessionEndDateStr = session.end_date.split('T')[0]; // Get YYYY-MM-DD
-        const hasPassedDate = sessionEndDateStr < todayStr;
+        // Get session end date
+        const sessionEndDateStr = session.end_date.split('T')[0]; // e.g., "2025-12-16"
         
-        // If date hasn't passed, always show in active
-        if (!hasPassedDate) return true;
+        // Calculate deadline: end_date + 2 days
+        const endDate = new Date(sessionEndDateStr);
+        endDate.setDate(endDate.getDate() + 2); // Add 2 days
+        const deadlineStr = endDate.toISOString().split('T')[0]; // e.g., "2025-12-18"
         
-        // Date has passed - check if all checklists are completed
-        const participants = session.participantsData || [];
-        if (participants.length === 0) return false; // No participants, hide if date passed
-        
-        const allChecklistsCompleted = participants.every(p => 
-          p.checklist && p.checklist.verification_status === 'completed'
-        );
-        
-        // Show in active if ANY checklist is pending, even if date passed
-        return !allChecklistsCompleted;
+        // Show session if today is on or before deadline
+        // Example: end_date = Dec 16, deadline = Dec 18, visible on Dec 16, 17, 18
+        // Hidden from Dec 19 onwards
+        return todayStr <= deadlineStr;
       });
       
       setSessions(activeSessions);
