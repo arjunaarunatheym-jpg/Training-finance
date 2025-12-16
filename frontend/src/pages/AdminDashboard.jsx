@@ -229,11 +229,13 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const loadData = async () => {
     try {
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
       const [companiesRes, programsRes, sessionsRes, usersRes] = await Promise.all([
-        axiosInstance.get("/companies"),
-        axiosInstance.get("/programs"),
-        axiosInstance.get("/sessions"),
-        axiosInstance.get("/users"),
+        axiosInstance.get(`/companies?_t=${timestamp}`),
+        axiosInstance.get(`/programs?_t=${timestamp}`),
+        axiosInstance.get(`/sessions?_t=${timestamp}`),
+        axiosInstance.get(`/users?_t=${timestamp}`),
       ]);
       setCompanies(companiesRes.data);
       setPrograms(programsRes.data);
