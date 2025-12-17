@@ -1426,7 +1426,8 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
                                                 onClick={() => {
                                                   const certUrl = certificateStatuses[p.id]?.url;
                                                   if (certUrl) {
-                                                    window.open(`http://localhost:8001${certUrl}`, '_blank');
+                                                    // Use REACT_APP_BACKEND_URL for external access
+                                                    window.open(`${process.env.REACT_APP_BACKEND_URL}${certUrl}`, '_blank');
                                                   }
                                                 }}
                                                 className="cursor-pointer text-xs text-blue-600 hover:underline"
