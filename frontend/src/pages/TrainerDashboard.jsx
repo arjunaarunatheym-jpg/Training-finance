@@ -70,26 +70,15 @@ const TrainerDashboard = ({ user, onLogout }) => {
         })
       );
       
-      // Filter sessions based on 2-day visibility window after end date
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0]; // Get YYYY-MM-DD format (e.g., "2025-12-19")
-      
+      // Filter sessions: Show until coordinator completes/closes the session
+      // Sessions remain visible regardless of date, until coordinator marks as completed
       const activeSessions = sessionsWithParticipants.filter(session => {
-        // If no end date, always show
-        if (!session.end_date) return true;
+        // Hide if coordinator has marked as completed
+        if (session.completed_by_coordinator === true) return false;
+        if (session.completion_status === 'completed' || session.completion_status === 'archived') return false;
         
-        // Get session end date
-        const sessionEndDateStr = session.end_date.split('T')[0]; // e.g., "2025-12-16"
-        
-        // Calculate deadline: end_date + 2 days
-        const endDate = new Date(sessionEndDateStr);
-        endDate.setDate(endDate.getDate() + 2); // Add 2 days
-        const deadlineStr = endDate.toISOString().split('T')[0]; // e.g., "2025-12-18"
-        
-        // Show session if today is on or before deadline
-        // Example: end_date = Dec 16, deadline = Dec 18, visible on Dec 16, 17, 18
-        // Hidden from Dec 19 onwards
-        return todayStr <= deadlineStr;
+        // Show all ongoing sessions (regardless of end date)
+        return true;
       });
       
       setSessions(activeSessions);
