@@ -1258,14 +1258,22 @@ async def get_sessions(
     current_date = get_malaysia_time().date()
     
     # Base query: exclude archived sessions
-    # For trainers/assistant_admin: only show future/current sessions (end_date >= today)
+    # For trainers/assistant_admin: show sessions until coordinator completes them (not date-based)
     # For coordinators/admin: show ALL non-completed sessions (no date filtering) - manual completion required
     if current_user.role in ["trainer", "assistant_admin"]:
         query = {
             "$and": [
                 {"is_archived": {"$ne": True}},  # Not archived
-                {"end_date": {"$gte": current_date.isoformat()}},  # Only current or future sessions
-                {"status": "active"}
+                {"status": "active"},
+                # Show until coordinator marks as completed
+                {
+                    "$or": [
+                        {"completed_by_coordinator": {"$exists": False}},
+                        {"completed_by_coordinator": False},
+                        {"completion_status": {"$exists": False}},
+                        {"completion_status": "ongoing"}
+                    ]
+                }
             ]
         }
     else:
