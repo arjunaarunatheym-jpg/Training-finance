@@ -132,6 +132,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const [filterEndDate, setFilterEndDate] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportDetailsOpen, setReportDetailsOpen] = useState(false);
+  const [marketingUsers, setMarketingUsers] = useState([]);
 
 
   // Certificates Repository states
