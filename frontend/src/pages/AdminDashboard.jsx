@@ -1231,10 +1231,10 @@ const AdminDashboard = ({ user, onLogout }) => {
               <span className="hidden sm:inline">Sessions</span>
               <span className="sm:hidden">Sessions</span>
             </TabsTrigger>
-            <TabsTrigger value="participants" data-testid="participants-tab" className="flex-1 min-w-[120px] md:min-w-0">
-              <Users className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Participants</span>
-              <span className="sm:hidden">Participants</span>
+            <TabsTrigger value="finance" data-testid="finance-tab" className="flex-1 min-w-[120px] md:min-w-0 bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+              <DollarSign className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Finance</span>
+              <span className="sm:hidden">Finance</span>
             </TabsTrigger>
             <TabsTrigger value="staff" data-testid="staff-tab" className="flex-1 min-w-[120px] md:min-w-0">
               <UserCog className="w-4 h-4 mr-2" />
