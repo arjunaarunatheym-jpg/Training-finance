@@ -619,7 +619,7 @@ class FeedbackTemplateUpdate(BaseModel):
 class Invoice(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    invoice_number: str  # e.g., INV-2025-0001
+    invoice_number: str  # e.g., INV/MDDRC/25/12/0001
     session_id: str
     company_id: str
     company_name: Optional[str] = None
@@ -627,12 +627,15 @@ class Invoice(BaseModel):
     training_dates: Optional[str] = None
     venue: Optional[str] = None
     pax: int = 0
+    num_days: int = 1  # Number of training days
     
-    # Pricing (controlled by Finance)
+    # Pricing type and line items
+    pricing_type: str = "lumpsum"  # lumpsum or per_pax
     line_items: List[dict] = []  # [{description, quantity, unit_price, amount}]
     subtotal: float = 0.0
-    tax_rate: float = 0.0
+    tax_rate: float = 0.0  # SST/GST percentage
     tax_amount: float = 0.0
+    discount: float = 0.0
     total_amount: float = 0.0
     
     # Status workflow
@@ -651,13 +654,15 @@ class Invoice(BaseModel):
     
     # Version control for revisions
     version: int = 1
-    parent_invoice_id: Optional[str] = None  # For revised invoices
+    parent_invoice_id: Optional[str] = None
 
 class InvoiceUpdate(BaseModel):
+    pricing_type: Optional[str] = None
     line_items: Optional[List[dict]] = None
     subtotal: Optional[float] = None
     tax_rate: Optional[float] = None
     tax_amount: Optional[float] = None
+    discount: Optional[float] = None
     total_amount: Optional[float] = None
     status: Optional[str] = None
 
@@ -681,15 +686,65 @@ class PaymentCreate(BaseModel):
     reference_number: Optional[str] = None
     notes: Optional[str] = None
 
+# Trainer Fee - Custom amount per trainer per session
+class TrainerFee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    trainer_id: str
+    trainer_name: Optional[str] = None
+    role: str  # chief_trainer, trainer, assistant_trainer
+    fee_amount: float = 0.0  # Custom fee set at booking
+    remark: Optional[str] = None
+    status: str = "pending"  # pending, approved, paid
+    paid_date: Optional[str] = None
+    paid_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+
+# Coordinator Fee - RM 50/day
+class CoordinatorFee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    coordinator_id: str
+    coordinator_name: Optional[str] = None
+    num_days: int = 1
+    daily_rate: float = 50.0  # RM 50 per day
+    total_fee: float = 0.0  # daily_rate * num_days
+    status: str = "pending"  # pending, approved, paid
+    paid_date: Optional[str] = None
+    paid_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+
+# Session Expenses - Both estimated and actual
+class SessionExpense(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    category: str  # accommodation, allowance, petrol, toll, wear_tear, printing, hrdc_levy, sst, other
+    description: Optional[str] = None
+    expense_type: str = "fixed"  # fixed or percentage
+    percentage_rate: float = 0.0  # If percentage-based
+    estimated_amount: float = 0.0
+    actual_amount: float = 0.0
+    quantity: int = 1
+    unit_price: float = 0.0
+    remark: Optional[str] = None
+    status: str = "estimated"  # estimated, actual, approved, paid
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+    updated_at: datetime = Field(default_factory=get_malaysia_time)
+
+# Marketing Commission - Based on PROFIT
 class MarketingCommission(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
     marketing_user_id: str
+    marketing_user_name: Optional[str] = None
     commission_type: str = "percentage"  # percentage or fixed
-    commission_rate: float = 0.0  # percentage value (e.g., 5.0 for 5%)
+    commission_rate: float = 0.0  # percentage of PROFIT (e.g., 10.0 for 10%)
     fixed_amount: float = 0.0  # if commission_type is fixed
-    calculated_amount: float = 0.0  # actual commission amount
+    calculated_amount: float = 0.0  # actual commission (calculated from profit)
     invoice_id: Optional[str] = None
     status: str = "pending"  # pending, approved, paid
     paid_date: Optional[str] = None
@@ -704,20 +759,42 @@ class MarketingCommissionCreate(BaseModel):
     commission_rate: float = 0.0
     fixed_amount: float = 0.0
 
+# Session Profit Summary - Calculated view
+class SessionProfitSummary(BaseModel):
+    session_id: str
+    session_name: Optional[str] = None
+    company_name: Optional[str] = None
+    training_dates: Optional[str] = None
+    
+    # Revenue
+    invoice_total: float = 0.0
+    less_tax: float = 0.0
+    gross_revenue: float = 0.0
+    
+    # Expenses breakdown
+    trainer_fees_total: float = 0.0
+    coordinator_fees_total: float = 0.0
+    cash_expenses_total: float = 0.0  # Training aid expenses
+    marketing_commission: float = 0.0
+    other_expenses: float = 0.0
+    total_expenses: float = 0.0
+    
+    # Profit
+    profit: float = 0.0
+    profit_percentage: float = 0.0
+
+# For backward compatibility - alias
 class TrainerIncome(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
     trainer_id: str
-    trainer_role: str  # chief_trainer, trainer, assistant_trainer
+    trainer_role: str
     amount: float = 0.0
-    status: str = "pending"  # pending, approved, paid
+    status: str = "pending"
     paid_date: Optional[str] = None
     paid_by: Optional[str] = None
     created_at: datetime = Field(default_factory=get_malaysia_time)
-
-class CoordinatorFee(BaseModel):
-    model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
     coordinator_id: str
