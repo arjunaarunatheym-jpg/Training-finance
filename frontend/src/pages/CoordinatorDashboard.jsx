@@ -2856,6 +2856,117 @@ const CoordinatorDashboard = ({ user, onLogout }) => {
               </Card>
             </TabsContent>
 
+            {/* Income Tab */}
+            <TabsContent value="income">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="w-5 h-5 text-green-600" />
+                        My Income
+                      </CardTitle>
+                      <CardDescription>View your coordination fees and payment status</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={async () => {
+                      setLoadingIncome(true);
+                      try {
+                        const response = await axiosInstance.get(`/finance/income/coordinator/${user.id}`);
+                        setIncomeData(response.data);
+                      } catch (error) {
+                        console.error('Failed to load income:', error);
+                      } finally {
+                        setLoadingIncome(false);
+                      }
+                    }} disabled={loadingIncome}>
+                      {loadingIncome ? 'Loading...' : 'Refresh'}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!incomeData ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500 mb-4">Click refresh to load your income data</p>
+                      <Button onClick={async () => {
+                        setLoadingIncome(true);
+                        try {
+                          const response = await axiosInstance.get(`/finance/income/coordinator/${user.id}`);
+                          setIncomeData(response.data);
+                        } catch (error) {
+                          console.error('Failed to load income:', error);
+                        } finally {
+                          setLoadingIncome(false);
+                        }
+                      }} disabled={loadingIncome}>
+                        {loadingIncome ? 'Loading...' : 'Load Income Data'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-green-700">Total Fees</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-green-900">
+                              RM {incomeData.summary.total_fees?.toLocaleString() || '0'}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-blue-700">Paid</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-blue-900">
+                              RM {incomeData.summary.paid_fees?.toLocaleString() || '0'}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-orange-700">Pending</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-orange-900">
+                              RM {incomeData.summary.pending_fees?.toLocaleString() || '0'}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Fee Records */}
+                      <div>
+                        <h3 className="font-semibold mb-3">Fee Records</h3>
+                        {incomeData.records.length === 0 ? (
+                          <p className="text-gray-500 text-center py-4">No fee records yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {incomeData.records.map((record) => (
+                              <div key={record.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium">{record.session_name || 'Training Session'}</p>
+                                  <p className="text-sm text-gray-500">{record.training_dates}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-lg">RM {record.amount?.toLocaleString() || '0'}</p>
+                                  <Badge className={record.status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'}>
+                                    {record.status === 'paid' ? 'Paid' : 'Pending'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
           </Tabs>
         )}
       </main>
