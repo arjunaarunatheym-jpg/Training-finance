@@ -161,6 +161,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     password: "",
     full_name: "",
     id_number: "",
+    additional_roles: [],
   });
   const [coordinatorDialogOpen, setCoordinatorDialogOpen] = useState(false);
 
@@ -169,8 +170,18 @@ const AdminDashboard = ({ user, onLogout }) => {
     password: "",
     full_name: "",
     id_number: "",
+    additional_roles: [],
   });
   const [assistantAdminDialogOpen, setAssistantAdminDialogOpen] = useState(false);
+
+  // Finance user form
+  const [financeForm, setFinanceForm] = useState({
+    email: "",
+    password: "",
+    full_name: "",
+    id_number: "",
+  });
+  const [financeDialogOpen, setFinanceDialogOpen] = useState(false);
 
   // Edit states
   const [editingProgram, setEditingProgram] = useState(null);
