@@ -274,6 +274,26 @@ function App() {
               )
             }
           />
+          <Route
+            path="/finance"
+            element={
+              user && (user.role === "finance" || user.role === "admin" || user.email === "arjuna@mddrc.com.my") ? (
+                <FinanceDashboard user={user} onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/marketing"
+            element={
+              user && (user.role === "marketing" || (user.additional_roles && user.additional_roles.includes("marketing"))) ? (
+                <MarketingDashboard user={user} onLogout={handleLogout} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
           </Routes>
         </BrowserRouter>
         <Toaster position="top-right" />
