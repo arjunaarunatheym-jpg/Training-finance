@@ -1774,6 +1774,80 @@ const AdminDashboard = ({ user, onLogout }) => {
                           </Select>
                         </div>
 
+                        {/* Marketing Commission */}
+                        <div className="space-y-4 border-t pt-4">
+                          <h3 className="font-semibold text-lg flex items-center gap-2">
+                            <DollarSign className="w-5 h-5 text-green-600" />
+                            Marketing Commission (Optional)
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Marketing Person</Label>
+                              <Select
+                                value={sessionForm.marketing_user_id}
+                                onValueChange={(value) => setSessionForm({ ...sessionForm, marketing_user_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select marketing person" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">None</SelectItem>
+                                  {marketingUsers.map((user) => (
+                                    <SelectItem key={user.id} value={user.id}>
+                                      {user.full_name} ({user.role}{user.additional_roles?.includes("marketing") ? " + Marketing" : ""})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Commission Type</Label>
+                              <Select
+                                value={sessionForm.commission_type}
+                                onValueChange={(value) => setSessionForm({ ...sessionForm, commission_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                  <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {sessionForm.marketing_user_id && (
+                            <div className="grid grid-cols-2 gap-4">
+                              {sessionForm.commission_type === "percentage" ? (
+                                <div>
+                                  <Label>Commission Rate (%)</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={sessionForm.commission_rate}
+                                    onChange={(e) => setSessionForm({ ...sessionForm, commission_rate: e.target.value })}
+                                    placeholder="e.g. 5"
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  <Label>Fixed Amount (RM)</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={sessionForm.commission_fixed_amount}
+                                    onChange={(e) => setSessionForm({ ...sessionForm, commission_fixed_amount: e.target.value })}
+                                    placeholder="e.g. 500"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                         {/* Add Supervisor (Optional) */}
                         <div className="space-y-4 border-t pt-4">
                           <h3 className="font-semibold text-lg">Add Supervisor (Optional)</h3>
