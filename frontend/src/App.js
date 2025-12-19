@@ -95,6 +95,10 @@ function App() {
                   <Navigate to="/participant" replace />
                 ) : user.role === "supervisor" || user.role === "pic_supervisor" ? (
                   <Navigate to="/supervisor" replace />
+                ) : user.role === "finance" ? (
+                  <Navigate to="/finance" replace />
+                ) : user.role === "marketing" ? (
+                  <Navigate to="/marketing" replace />
                 ) : (
                   // All other roles (admin, assistant_admin, coordinator, trainer) and super admin go to calendar
                   <Navigate to="/calendar" replace />
