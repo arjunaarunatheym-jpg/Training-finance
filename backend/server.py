@@ -598,6 +598,131 @@ class FeedbackTemplateUpdate(BaseModel):
     footer_text: Optional[str] = None
     max_certificate_file_size_mb: Optional[int] = None
 
+# ============ FINANCE MODELS ============
+
+class Invoice(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_number: str  # e.g., INV-2025-0001
+    session_id: str
+    company_id: str
+    company_name: Optional[str] = None
+    programme_name: Optional[str] = None
+    training_dates: Optional[str] = None
+    venue: Optional[str] = None
+    pax: int = 0
+    
+    # Pricing (controlled by Finance)
+    line_items: List[dict] = []  # [{description, quantity, unit_price, amount}]
+    subtotal: float = 0.0
+    tax_rate: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    
+    # Status workflow
+    status: str = "auto_draft"  # auto_draft, finance_review, approved, issued, paid, cancelled
+    
+    # Tracking
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+    updated_at: datetime = Field(default_factory=get_malaysia_time)
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    issued_by: Optional[str] = None
+    issued_at: Optional[datetime] = None
+    cancelled_by: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
+    cancellation_reason: Optional[str] = None
+    
+    # Version control for revisions
+    version: int = 1
+    parent_invoice_id: Optional[str] = None  # For revised invoices
+
+class InvoiceUpdate(BaseModel):
+    line_items: Optional[List[dict]] = None
+    subtotal: Optional[float] = None
+    tax_rate: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total_amount: Optional[float] = None
+    status: Optional[str] = None
+
+class Payment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_id: str
+    amount: float
+    payment_date: str  # YYYY-MM-DD
+    payment_method: str  # bank_transfer, cheque, cash, online
+    reference_number: Optional[str] = None
+    notes: Optional[str] = None
+    recorded_by: str
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+
+class PaymentCreate(BaseModel):
+    invoice_id: str
+    amount: float
+    payment_date: str
+    payment_method: str
+    reference_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class MarketingCommission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    marketing_user_id: str
+    commission_type: str = "percentage"  # percentage or fixed
+    commission_rate: float = 0.0  # percentage value (e.g., 5.0 for 5%)
+    fixed_amount: float = 0.0  # if commission_type is fixed
+    calculated_amount: float = 0.0  # actual commission amount
+    invoice_id: Optional[str] = None
+    status: str = "pending"  # pending, approved, paid
+    paid_date: Optional[str] = None
+    paid_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+    updated_at: datetime = Field(default_factory=get_malaysia_time)
+
+class MarketingCommissionCreate(BaseModel):
+    session_id: str
+    marketing_user_id: str
+    commission_type: str = "percentage"
+    commission_rate: float = 0.0
+    fixed_amount: float = 0.0
+
+class TrainerIncome(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    trainer_id: str
+    trainer_role: str  # chief_trainer, trainer, assistant_trainer
+    amount: float = 0.0
+    status: str = "pending"  # pending, approved, paid
+    paid_date: Optional[str] = None
+    paid_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+
+class CoordinatorFee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    coordinator_id: str
+    amount: float = 0.0
+    status: str = "pending"  # pending, approved, paid
+    paid_date: Optional[str] = None
+    paid_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_malaysia_time)
+
+class FinanceAuditLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    entity_type: str  # invoice, payment, commission, trainer_income, coordinator_fee
+    entity_id: str
+    action: str  # created, updated, status_changed, deleted
+    before_value: Optional[dict] = None
+    after_value: Optional[dict] = None
+    changed_by: str
+    reason: Optional[str] = None
+    timestamp: datetime = Field(default_factory=get_malaysia_time)
+
 # ============ HELPER FUNCTIONS ============
 
 def hash_password(password: str) -> str:
