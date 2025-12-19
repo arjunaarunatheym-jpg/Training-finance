@@ -194,6 +194,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     full_name: "",
     email: "",
     id_number: "",
+    additional_roles: [],
   });
   
   // Delete confirmation states
