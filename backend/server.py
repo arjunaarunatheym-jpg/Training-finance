@@ -199,6 +199,11 @@ class SessionCreate(BaseModel):
     supervisors: List[SupervisorData] = []  # New supervisors to create or link
     trainer_assignments: List[dict] = []
     coordinator_id: Optional[str] = None
+    # Marketing commission fields
+    marketing_user_id: Optional[str] = None
+    commission_type: Optional[str] = None  # percentage or fixed
+    commission_rate: Optional[float] = None  # percentage value
+    commission_fixed_amount: Optional[float] = None  # fixed amount if applicable
 
 class ParticipantAccess(BaseModel):
     model_config = ConfigDict(extra="ignore")
