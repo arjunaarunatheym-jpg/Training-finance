@@ -1367,6 +1367,11 @@ async def create_session(session_data: SessionCreate, current_user: User = Depen
         supervisor_ids=processed_supervisor_ids,
         trainer_assignments=session_data.trainer_assignments,
         coordinator_id=session_data.coordinator_id,
+        # Marketing commission fields
+        marketing_user_id=session_data.marketing_user_id,
+        commission_type=session_data.commission_type,
+        commission_rate=session_data.commission_rate,
+        commission_fixed_amount=session_data.commission_fixed_amount,
     )
     
     doc = session_obj.model_dump()
@@ -1375,6 +1380,40 @@ async def create_session(session_data: SessionCreate, current_user: User = Depen
     # completed_by_coordinator is already set to False by default in the model
     
     await db.sessions.insert_one(doc)
+    
+    # Auto-create draft invoice for this session
+    try:
+        invoice = await create_auto_invoice_for_session(doc, current_user.id)
+        # Update session with invoice reference
+        await db.sessions.update_one(
+            {"id": session_obj.id},
+            {"$set": {
+                "invoice_id": invoice["id"],
+                "invoice_number": invoice["invoice_number"],
+                "invoice_status": invoice["status"]
+            }}
+        )
+        session_obj.invoice_id = invoice["id"]
+        session_obj.invoice_number = invoice["invoice_number"]
+        session_obj.invoice_status = invoice["status"]
+    except Exception as e:
+        logging.error(f"Failed to create auto-invoice for session {session_obj.id}: {str(e)}")
+    
+    # Create marketing commission record if marketing person assigned
+    if session_data.marketing_user_id:
+        commission_record = {
+            "id": str(uuid.uuid4()),
+            "session_id": session_obj.id,
+            "marketing_user_id": session_data.marketing_user_id,
+            "commission_type": session_data.commission_type or "percentage",
+            "commission_rate": session_data.commission_rate or 0.0,
+            "fixed_amount": session_data.commission_fixed_amount or 0.0,
+            "calculated_amount": 0.0,  # Will be calculated when invoice is issued
+            "status": "pending",
+            "created_at": get_malaysia_time().isoformat(),
+            "updated_at": get_malaysia_time().isoformat()
+        }
+        await db.marketing_commissions.insert_one(commission_record)
     
     # Create participant access records
     for participant_id in processed_participant_ids:
