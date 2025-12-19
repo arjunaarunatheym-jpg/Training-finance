@@ -2803,6 +2803,26 @@ const AdminDashboard = ({ user, onLogout }) => {
                       required
                     />
                   </div>
+                  {editingStaff && ["coordinator", "assistant_admin"].includes(editingStaff.role) && (
+                    <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id="edit-staff-marketing"
+                        checked={editStaffForm.additional_roles?.includes("marketing")}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEditStaffForm({ ...editStaffForm, additional_roles: [...(editStaffForm.additional_roles || []), "marketing"] });
+                          } else {
+                            setEditStaffForm({ ...editStaffForm, additional_roles: (editStaffForm.additional_roles || []).filter(r => r !== "marketing") });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <Label htmlFor="edit-staff-marketing" className="text-sm font-medium">
+                        Also has Marketing access
+                      </Label>
+                    </div>
+                  )}
                   <Button type="submit" className="w-full">
                     Update Staff Member
                   </Button>
