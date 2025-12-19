@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useTheme } from "../context/ThemeContext";
-import { LogOut, Calendar, ClipboardCheck, Users, FileText, ChevronDown, ChevronRight, MessageSquare, Search, Eye, Building2, BookOpen } from "lucide-react";
+import { LogOut, Calendar, ClipboardCheck, Users, FileText, ChevronDown, ChevronRight, MessageSquare, Search, Eye, Building2, BookOpen, DollarSign } from "lucide-react";
 
 const TrainerDashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
