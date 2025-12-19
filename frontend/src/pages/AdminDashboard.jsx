@@ -92,6 +92,11 @@ const AdminDashboard = ({ user, onLogout }) => {
     supervisors: [], // Supervisors to create/link
     trainer_assignments: [],
     coordinator_id: "",
+    // Marketing commission fields
+    marketing_user_id: "",
+    commission_type: "percentage",
+    commission_rate: "",
+    commission_fixed_amount: "",
   });
   const [newParticipant, setNewParticipant] = useState({
     email: "",
