@@ -2411,6 +2411,24 @@ const AdminDashboard = ({ user, onLogout }) => {
                                   required
                                 />
                               </div>
+                              <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
+                                <input
+                                  type="checkbox"
+                                  id="coordinator-marketing"
+                                  checked={coordinatorForm.additional_roles.includes("marketing")}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setCoordinatorForm({ ...coordinatorForm, additional_roles: [...coordinatorForm.additional_roles, "marketing"] });
+                                    } else {
+                                      setCoordinatorForm({ ...coordinatorForm, additional_roles: coordinatorForm.additional_roles.filter(r => r !== "marketing") });
+                                    }
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                <Label htmlFor="coordinator-marketing" className="text-sm font-medium">
+                                  Also has Marketing access (can view training calendar & own commission)
+                                </Label>
+                              </div>
                               <Button data-testid="submit-coordinator-button" type="submit" className="w-full">
                                 Create Coordinator
                               </Button>
