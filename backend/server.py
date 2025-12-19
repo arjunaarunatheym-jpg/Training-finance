@@ -1265,6 +1265,8 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
         update_data["email"] = user_data["email"]
     if "id_number" in user_data:
         update_data["id_number"] = user_data["id_number"]
+    if "additional_roles" in user_data:
+        update_data["additional_roles"] = user_data["additional_roles"]
     
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
