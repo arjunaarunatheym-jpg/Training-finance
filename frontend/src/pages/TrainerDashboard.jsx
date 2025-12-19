@@ -33,6 +33,10 @@ const TrainerDashboard = ({ user, onLogout }) => {
   const [loadingPastTraining, setLoadingPastTraining] = useState(false);
   const [expandedPastSession, setExpandedPastSession] = useState(null);
 
+  // Income states
+  const [incomeData, setIncomeData] = useState(null);
+  const [loadingIncome, setLoadingIncome] = useState(false);
+
 
   useEffect(() => {
     loadSessions();
