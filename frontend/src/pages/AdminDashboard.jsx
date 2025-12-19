@@ -2557,6 +2557,24 @@ const AdminDashboard = ({ user, onLogout }) => {
                                   required
                                 />
                               </div>
+                              <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
+                                <input
+                                  type="checkbox"
+                                  id="assistant-admin-marketing"
+                                  checked={assistantAdminForm.additional_roles.includes("marketing")}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAssistantAdminForm({ ...assistantAdminForm, additional_roles: [...assistantAdminForm.additional_roles, "marketing"] });
+                                    } else {
+                                      setAssistantAdminForm({ ...assistantAdminForm, additional_roles: assistantAdminForm.additional_roles.filter(r => r !== "marketing") });
+                                    }
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                <Label htmlFor="assistant-admin-marketing" className="text-sm font-medium">
+                                  Also has Marketing access
+                                </Label>
+                              </div>
                               <Button data-testid="submit-assistant-admin-button" type="submit" className="w-full">
                                 Create Assistant Admin
                               </Button>
