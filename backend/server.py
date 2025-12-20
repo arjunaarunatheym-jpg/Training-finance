@@ -7278,6 +7278,135 @@ async def cancel_invoice(invoice_id: str, reason: str = "", current_user: User =
     
     return {"message": "Invoice cancelled successfully"}
 
+# ============= CREDIT NOTE ENDPOINTS =============
+
+@api_router.get("/finance/credit-notes")
+async def get_credit_notes(current_user: User = Depends(get_current_user)):
+    """Get all credit notes"""
+    if current_user.role not in ["admin", "super_admin", "finance", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    credit_notes = await db.credit_notes.find({}, {"_id": 0}).to_list(1000)
+    return credit_notes
+
+@api_router.post("/finance/credit-notes")
+async def create_credit_note(cn_data: dict, current_user: User = Depends(get_current_user)):
+    """Create a credit note (e.g., for HRDCorp 4% deduction)"""
+    if current_user.role not in ["admin", "super_admin", "finance", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    invoice_id = cn_data.get("invoice_id")
+    invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0}) if invoice_id else None
+    
+    now = get_malaysia_time()
+    cn_number = await generate_credit_note_number()
+    
+    credit_note = {
+        "id": str(uuid.uuid4()),
+        "cn_number": cn_number,
+        "invoice_id": invoice_id,
+        "invoice_number": invoice.get("invoice_number") if invoice else None,
+        "session_id": cn_data.get("session_id"),
+        "company_id": cn_data.get("company_id") or (invoice.get("company_id") if invoice else None),
+        "company_name": cn_data.get("company_name") or (invoice.get("company_name") if invoice else None),
+        "reason": cn_data.get("reason", "HRDCorp Levy Deduction"),
+        "description": cn_data.get("description", "4% HRDCorp levy deducted from payment"),
+        "amount": float(cn_data.get("amount", 0)),
+        "percentage": float(cn_data.get("percentage", 4)),  # Default 4% for HRDCorp
+        "status": "draft",
+        "created_by": current_user.id,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    }
+    
+    await db.credit_notes.insert_one(credit_note)
+    await log_finance_action("credit_note", credit_note["id"], "created", current_user.id, after_value=credit_note)
+    
+    return {"message": "Credit note created", "cn_number": cn_number, "id": credit_note["id"]}
+
+@api_router.get("/finance/credit-notes/{cn_id}")
+async def get_credit_note(cn_id: str, current_user: User = Depends(get_current_user)):
+    """Get a specific credit note"""
+    if current_user.role not in ["admin", "super_admin", "finance", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    credit_note = await db.credit_notes.find_one({"id": cn_id}, {"_id": 0})
+    if not credit_note:
+        raise HTTPException(status_code=404, detail="Credit note not found")
+    
+    return credit_note
+
+@api_router.put("/finance/credit-notes/{cn_id}")
+async def update_credit_note(cn_id: str, update_data: dict, current_user: User = Depends(get_current_user)):
+    """Update a credit note"""
+    if current_user.role not in ["admin", "super_admin", "finance"]:
+        raise HTTPException(status_code=403, detail="Only Finance can update credit notes")
+    
+    credit_note = await db.credit_notes.find_one({"id": cn_id}, {"_id": 0})
+    if not credit_note:
+        raise HTTPException(status_code=404, detail="Credit note not found")
+    
+    if credit_note.get("status") == "approved":
+        raise HTTPException(status_code=400, detail="Cannot modify approved credit note")
+    
+    allowed_fields = ["reason", "description", "amount", "percentage", "status"]
+    update_dict = {k: v for k, v in update_data.items() if k in allowed_fields and v is not None}
+    update_dict["updated_at"] = get_malaysia_time().isoformat()
+    
+    await db.credit_notes.update_one({"id": cn_id}, {"$set": update_dict})
+    await log_finance_action("credit_note", cn_id, "updated", current_user.id, credit_note, update_dict)
+    
+    return await db.credit_notes.find_one({"id": cn_id}, {"_id": 0})
+
+@api_router.post("/finance/session/{session_id}/credit-note")
+async def create_session_credit_note(session_id: str, cn_data: dict, current_user: User = Depends(get_current_user)):
+    """Create a credit note for a session (typically for HRDCorp deduction)"""
+    if current_user.role not in ["admin", "super_admin", "finance", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get the session's invoice
+    invoice = await db.invoices.find_one({"session_id": session_id}, {"_id": 0})
+    
+    # Get company info
+    company = await db.companies.find_one({"id": session.get("company_id")}, {"_id": 0, "name": 1})
+    
+    # Calculate CN amount
+    percentage = float(cn_data.get("percentage", 4))  # Default 4% for HRDCorp
+    base_amount = float(cn_data.get("base_amount", invoice.get("total_amount", 0) if invoice else 0))
+    cn_amount = float(cn_data.get("amount", 0)) or (base_amount * percentage / 100)
+    
+    now = get_malaysia_time()
+    cn_number = await generate_credit_note_number()
+    
+    credit_note = {
+        "id": str(uuid.uuid4()),
+        "cn_number": cn_number,
+        "invoice_id": invoice.get("id") if invoice else None,
+        "invoice_number": invoice.get("invoice_number") if invoice else None,
+        "session_id": session_id,
+        "session_name": session.get("name"),
+        "company_id": session.get("company_id"),
+        "company_name": company.get("name") if company else None,
+        "reason": cn_data.get("reason", "HRDCorp Levy Deduction"),
+        "description": cn_data.get("description", f"{percentage}% HRDCorp levy deducted from payment"),
+        "base_amount": base_amount,
+        "percentage": percentage,
+        "amount": cn_amount,
+        "status": "draft",
+        "created_by": current_user.id,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat()
+    }
+    
+    await db.credit_notes.insert_one(credit_note)
+    await log_finance_action("credit_note", credit_note["id"], "created", current_user.id, after_value=credit_note)
+    
+    return {"message": "Credit note created", "cn_number": cn_number, "id": credit_note["id"], "amount": cn_amount}
+
 @api_router.post("/finance/payments")
 async def record_payment(payment_data: PaymentCreate, current_user: User = Depends(get_current_user)):
     """Record payment"""
