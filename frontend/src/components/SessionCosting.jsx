@@ -24,7 +24,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
     pricing_type: 'lumpsum',
     lumpsum_amount: '',
     per_pax_rate: '',
-    tax_rate: '6', // Default SST 6%
+    tax_rate: '', // Default blank - user can add if needed
   });
   
   const [trainerFees, setTrainerFees] = useState([]);
