@@ -1004,12 +1004,13 @@ const TrainerDashboard = ({ user, onLogout }) => {
                           {incomeData.records.map((record) => (
                             <div key={record.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
                               <div>
-                                <p className="font-medium">{record.session_name || 'Training Session'}</p>
+                                <p className="font-medium">{record.company_name || record.session_name || 'Training Session'}</p>
+                                <p className="text-sm text-gray-600">{record.session_name}</p>
                                 <p className="text-sm text-gray-500">{record.training_dates}</p>
-                                <p className="text-xs text-gray-400">Role: {record.trainer_role}</p>
+                                <p className="text-xs text-gray-400">Role: {record.role || record.trainer_role || 'Trainer'}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-bold text-lg">RM {record.amount?.toLocaleString() || '0'}</p>
+                                <p className="font-bold text-lg">RM {(record.fee_amount || record.amount)?.toLocaleString() || '0'}</p>
                                 <Badge className={record.status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'}>
                                   {record.status === 'paid' ? 'Paid' : 'Pending'}
                                 </Badge>
