@@ -7308,23 +7308,32 @@ async def get_payments(invoice_id: Optional[str] = None, current_user: User = De
 
 @api_router.get("/finance/income/trainer/{trainer_id}")
 async def get_trainer_income(trainer_id: str, current_user: User = Depends(get_current_user)):
-    """Get trainer income"""
+    """Get trainer income from all sessions"""
     if current_user.role == "trainer" and current_user.id != trainer_id:
         raise HTTPException(status_code=403, detail="Can only view your own income")
     
     if current_user.role not in ["admin", "super_admin", "finance", "trainer"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    records = await db.trainer_income.find({"trainer_id": trainer_id}, {"_id": 0}).to_list(1000)
+    # Get records from trainer_fees collection (set in session costing)
+    records = await db.trainer_fees.find({"trainer_id": trainer_id}, {"_id": 0}).to_list(1000)
     
+    # Enrich with session details
     for record in records:
         session = await db.sessions.find_one({"id": record.get("session_id")}, {"_id": 0, "name": 1, "start_date": 1, "end_date": 1})
+        company = None
         if session:
             record["session_name"] = session.get("name")
             record["training_dates"] = f"{session.get('start_date')} to {session.get('end_date')}"
+            # Get company name
+            session_full = await db.sessions.find_one({"id": record.get("session_id")}, {"_id": 0, "company_id": 1})
+            if session_full:
+                company = await db.companies.find_one({"id": session_full.get("company_id")}, {"_id": 0, "name": 1})
+                record["company_name"] = company.get("name") if company else None
+        record["amount"] = record.get("fee_amount", 0)  # Map fee_amount to amount for consistency
     
-    total = sum(r.get("amount", 0) for r in records)
-    paid = sum(r.get("amount", 0) for r in records if r.get("status") == "paid")
+    total = sum(r.get("fee_amount", 0) for r in records)
+    paid = sum(r.get("fee_amount", 0) for r in records if r.get("status") == "paid")
     
     return {"records": records, "summary": {"total_income": total, "paid_income": paid, "pending_income": total - paid}}
 
