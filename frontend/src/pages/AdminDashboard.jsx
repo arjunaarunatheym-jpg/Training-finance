@@ -277,6 +277,29 @@ const AdminDashboard = ({ user, onLogout }) => {
         // Marketing users endpoint might fail if no finance access, ignore
         console.log('Marketing users not loaded:', e.message);
       }
+      
+      // Load finance summary
+      try {
+        const invoicesRes = await axiosInstance.get(`/finance/invoices?_t=${timestamp}`);
+        const invoices = invoicesRes.data;
+        const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+        const totalCollected = invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+        const totalOutstanding = totalInvoiced - totalCollected;
+        
+        // Get pending payables (trainer fees + coordinator fees)
+        const trainerFeesRes = await axiosInstance.get(`/finance/dashboard?_t=${timestamp}`).catch(() => ({ data: {} }));
+        const totalPayables = (trainerFeesRes.data?.pending_trainer_fees || 0) + (trainerFeesRes.data?.pending_coordinator_fees || 0);
+        
+        setFinanceSummary({
+          invoices,
+          totalInvoiced,
+          totalCollected,
+          totalOutstanding,
+          totalPayables
+        });
+      } catch (e) {
+        console.log('Finance data not loaded:', e.message);
+      }
     } catch (error) {
       toast.error("Failed to load data");
     }
