@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { 
   DollarSign, Users, Truck, Calculator, Plus, Trash2, Save, 
-  FileText, TrendingUp, User, Building2, Calendar, RefreshCw
+  FileText, TrendingUp, User, Building2, Calendar, RefreshCw, FileX
 } from 'lucide-react';
 
 const SessionCosting = ({ session, onClose, onUpdate }) => {
@@ -18,6 +18,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
   const [costing, setCosting] = useState(null);
   const [expenseCategories, setExpenseCategories] = useState([]);
   const [invoiceId, setInvoiceId] = useState(null);
+  const [creditNotes, setCreditNotes] = useState([]);
   
   // Form states
   const [invoiceData, setInvoiceData] = useState({
