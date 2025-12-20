@@ -2473,7 +2473,9 @@ const AdminDashboard = ({ user, onLogout }) => {
                     <CardTitle className="text-sm font-medium text-blue-700">Total Invoices</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-900" id="finance-total-invoices">-</div>
+                    <div className="text-2xl font-bold text-blue-900">
+                      {financeSummary.invoices.length} (RM {financeSummary.totalInvoiced.toLocaleString()})
+                    </div>
                   </CardContent>
                 </Card>
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
@@ -2481,7 +2483,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                     <CardTitle className="text-sm font-medium text-green-700">Total Collected</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-900" id="finance-collected">RM 0</div>
+                    <div className="text-2xl font-bold text-green-900">RM {financeSummary.totalCollected.toLocaleString()}</div>
                   </CardContent>
                 </Card>
                 <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
@@ -2489,7 +2491,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                     <CardTitle className="text-sm font-medium text-orange-700">Outstanding</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-orange-900" id="finance-outstanding">RM 0</div>
+                    <div className="text-2xl font-bold text-orange-900">RM {financeSummary.totalOutstanding.toLocaleString()}</div>
                   </CardContent>
                 </Card>
                 <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
@@ -2497,7 +2499,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                     <CardTitle className="text-sm font-medium text-purple-700">Pending Payables</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-purple-900" id="finance-payables">RM 0</div>
+                    <div className="text-2xl font-bold text-purple-900">RM {financeSummary.totalPayables.toLocaleString()}</div>
                   </CardContent>
                 </Card>
               </div>
