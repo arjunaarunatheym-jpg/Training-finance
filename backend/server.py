@@ -7006,7 +7006,8 @@ async def get_supervisor_session_attendance(session_id: str, current_user: User 
 
 # Invoice number generation
 async def generate_invoice_number():
-    """Generate unique invoice number: INV/MDDRC/YYYY/MM/0001"""
+    """Generate unique invoice number: INV/MDDRC/YYYY/MM/0001
+    Resets sequence each month"""
     now = get_malaysia_time()
     year = now.year
     month = now.month
@@ -7020,6 +7021,28 @@ async def generate_invoice_number():
     if last_invoice:
         # Extract last number from invoice number like INV/MDDRC/2025/12/0001
         last_num = int(last_invoice["invoice_number"].split("/")[-1])
+        new_num = last_num + 1
+    else:
+        new_num = 1
+    
+    return f"{prefix}{new_num:04d}"
+
+# Credit Note number generation
+async def generate_credit_note_number():
+    """Generate unique credit note number: CN/MDDRC/YYYY/MM/0001
+    Resets sequence each month"""
+    now = get_malaysia_time()
+    year = now.year
+    month = now.month
+    prefix = f"CN/MDDRC/{year}/{month:02d}/"
+    
+    last_cn = await db.credit_notes.find_one(
+        {"cn_number": {"$regex": f"^CN/MDDRC/{year}/{month:02d}/"}},
+        sort=[("cn_number", -1)]
+    )
+    
+    if last_cn:
+        last_num = int(last_cn["cn_number"].split("/")[-1])
         new_num = last_num + 1
     else:
         new_num = 1
