@@ -19,6 +19,7 @@ import Settings from "./Settings";
 import DataManagement from "../components/DataManagement";
 import { useTheme } from "../context/ThemeContext";
 import { SearchBar } from "../components/SearchBar";
+import SessionCosting from "../components/SessionCosting";
 
 const AdminDashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
