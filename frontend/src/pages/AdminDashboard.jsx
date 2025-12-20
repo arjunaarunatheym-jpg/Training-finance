@@ -2144,7 +2144,17 @@ const AdminDashboard = ({ user, onLogout }) => {
                                 <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                                   {session.participant_ids.length} Participants
                                 </span>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap justify-end">
+                                  <Button
+                                    data-testid={`costing-session-${session.id}`}
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-green-50 border-green-200 hover:bg-green-100 text-green-700"
+                                    onClick={() => setCostingSession(session)}
+                                  >
+                                    <DollarSign className="w-4 h-4 mr-1" />
+                                    Costing
+                                  </Button>
                                   <Button
                                     data-testid={`edit-session-${session.id}`}
                                     size="sm"
