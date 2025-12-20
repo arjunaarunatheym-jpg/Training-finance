@@ -414,19 +414,17 @@ class SessionCostingTestRunner:
             return False
         
         # Step 4: Save expenses (500 total)
-        expenses_data = {
-            "expenses": [
-                {
-                    "category": "accommodation",
-                    "description": "Test accommodation expense",
-                    "expense_type": "fixed",
-                    "actual_amount": 500.0,
-                    "quantity": 1,
-                    "unit_price": 500.0,
-                    "remark": "Test expense for calculation"
-                }
-            ]
-        }
+        expenses_data = [
+            {
+                "category": "accommodation",
+                "description": "Test accommodation expense",
+                "expense_type": "fixed",
+                "actual_amount": 500.0,
+                "quantity": 1,
+                "unit_price": 500.0,
+                "remark": "Test expense for calculation"
+            }
+        ]
         
         try:
             response = self.session.post(f"{BASE_URL}/finance/session/{self.session_id}/expenses", 
