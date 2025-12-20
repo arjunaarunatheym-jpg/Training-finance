@@ -490,6 +490,52 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
             </CardContent>
           </Card>
 
+          {/* Credit Notes (for HRDCorp deductions) */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileX className="w-5 h-5 text-red-600" />
+                    Credit Notes
+                  </CardTitle>
+                  <CardDescription>For HRDCorp levy deductions (4% of invoice)</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={createCreditNote}
+                  disabled={!profit.invoiceTotal || profit.invoiceTotal <= 0}
+                  className="border-red-200 text-red-600 hover:bg-red-50"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Create CN (4%)
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {creditNotes.length === 0 ? (
+                <p className="text-gray-500 text-center py-2 text-sm">No credit notes yet. Create one when HRDCorp deducts their levy.</p>
+              ) : (
+                <div className="space-y-2">
+                  {creditNotes.map((cn) => (
+                    <div key={cn.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-red-700">{cn.cn_number}</p>
+                        <p className="text-sm text-gray-600">{cn.reason} - {cn.description}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-red-600">- RM {cn.amount?.toLocaleString()}</p>
+                        <Badge className={cn.status === 'approved' ? 'bg-green-500' : 'bg-yellow-500'}>
+                          {cn.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Trainer Fees */}
           <Card>
             <CardHeader>
