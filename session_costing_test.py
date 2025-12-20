@@ -374,17 +374,15 @@ class SessionCostingTestRunner:
         # For testing, we'll assume the invoice is already set to 10000 with 6% tax
         
         # Step 2: Save trainer fees (1500 total)
-        trainer_fees_data = {
-            "trainer_fees": [
-                {
-                    "trainer_id": "test-trainer-1",
-                    "trainer_name": "Test Trainer",
-                    "role": "chief_trainer",
-                    "fee_amount": 1500.0,
-                    "remark": "Test trainer fee for calculation"
-                }
-            ]
-        }
+        trainer_fees_data = [
+            {
+                "trainer_id": "test-trainer-1",
+                "trainer_name": "Test Trainer",
+                "role": "chief_trainer",
+                "fee_amount": 1500.0,
+                "remark": "Test trainer fee for calculation"
+            }
+        ]
         
         try:
             response = self.session.post(f"{BASE_URL}/finance/session/{self.session_id}/trainer-fees", 
