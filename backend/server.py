@@ -7601,11 +7601,25 @@ async def get_audit_log(entity_type: Optional[str] = None, entity_id: Optional[s
     
     logs = await db.finance_audit_log.find(query, {"_id": 0}).sort("timestamp", -1).to_list(limit)
     
+    # Enrich with user names and ensure serializable
+    result = []
     for log in logs:
         user = await db.users.find_one({"id": log.get("changed_by")}, {"_id": 0, "full_name": 1})
-        log["changed_by_name"] = user.get("full_name") if user else "Unknown"
+        log_dict = {
+            "id": log.get("id"),
+            "entity_type": log.get("entity_type"),
+            "entity_id": log.get("entity_id"),
+            "action": log.get("action"),
+            "changed_by": log.get("changed_by"),
+            "changed_by_name": user.get("full_name") if user else "Unknown",
+            "timestamp": log.get("timestamp"),
+            "before_value": str(log.get("before_value", "")) if log.get("before_value") else None,
+            "after_value": str(log.get("after_value", "")) if log.get("after_value") else None,
+            "remark": log.get("remark")
+        }
+        result.append(log_dict)
     
-    return logs
+    return result
 
 @api_router.post("/finance/income/trainer/{record_id}/mark-paid")
 async def mark_trainer_paid(record_id: str, current_user: User = Depends(get_current_user)):
