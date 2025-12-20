@@ -214,20 +214,33 @@ class FinancePortalTestRunner:
                                        json=invoice_data, headers=headers)
             
             if response.status_code == 200:
-                invoice = response.json()
-                self.log(f"✅ Invoice created/updated successfully. ID: {invoice.get('id')}")
-                self.log(f"   Total Amount: RM {invoice.get('total_amount', 0)}")
-                self.log(f"   Tax Rate: {invoice.get('tax_rate', 0)}%")
-                self.log(f"   Invoice Number: {invoice.get('invoice_number', 'N/A')}")
+                result = response.json()
+                self.log(f"✅ Invoice created/updated successfully. Response: {result}")
                 
-                # Verify total_amount is saved correctly
-                if invoice.get('total_amount') == 10000.00:
-                    self.log("✅ Total amount saved correctly")
+                # Get the invoice ID and fetch the actual invoice to verify
+                invoice_id = result.get('invoice_id')
+                if invoice_id:
+                    # Fetch the created invoice to verify data persistence
+                    get_response = self.session.get(f"{BASE_URL}/finance/invoices/{invoice_id}", headers=headers)
+                    if get_response.status_code == 200:
+                        invoice = get_response.json()
+                        self.log(f"   Total Amount: RM {invoice.get('total_amount', 0)}")
+                        self.log(f"   Tax Rate: {invoice.get('tax_rate', 0)}%")
+                        self.log(f"   Invoice Number: {invoice.get('invoice_number', 'N/A')}")
+                        
+                        # Verify total_amount is saved correctly
+                        if invoice.get('total_amount') == 10000.00:
+                            self.log("✅ Total amount saved correctly")
+                            return True
+                        else:
+                            self.log(f"❌ Total amount incorrect. Expected: 10000.00, Got: {invoice.get('total_amount')}", "ERROR")
+                            return False
+                    else:
+                        self.log(f"❌ Failed to fetch created invoice: {get_response.status_code}", "ERROR")
+                        return False
                 else:
-                    self.log(f"❌ Total amount incorrect. Expected: 10000.00, Got: {invoice.get('total_amount')}", "ERROR")
+                    self.log("❌ No invoice_id returned in response", "ERROR")
                     return False
-                
-                return True
             else:
                 self.log(f"❌ Invoice creation failed: {response.status_code} - {response.text}", "ERROR")
                 return False
