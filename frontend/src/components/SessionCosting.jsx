@@ -64,13 +64,22 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
           const existing = existingFees.find(f => f.trainer_id === ta.trainer_id);
           return {
             trainer_id: ta.trainer_id,
-            trainer_name: ta.trainer_name,
+            trainer_name: existing?.trainer_name || ta.trainer_name || 'Unknown Trainer',
             role: ta.role,
             fee_amount: existing?.fee_amount || '',
             remark: existing?.remark || ''
           };
         });
         setTrainerFees(fees);
+      } else if (costingRes.data.trainer_fees?.length > 0) {
+        // If session doesn't have trainer_assignments but costing has trainer fees
+        setTrainerFees(costingRes.data.trainer_fees.map(f => ({
+          trainer_id: f.trainer_id,
+          trainer_name: f.trainer_name || 'Unknown Trainer',
+          role: f.role || 'trainer',
+          fee_amount: f.fee_amount || '',
+          remark: f.remark || ''
+        })));
       }
       
       // Initialize coordinator fee
