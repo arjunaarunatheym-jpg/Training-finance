@@ -36,6 +36,11 @@ const TrainerDashboard = ({ user, onLogout }) => {
   // Income states
   const [incomeData, setIncomeData] = useState(null);
   const [loadingIncome, setLoadingIncome] = useState(false);
+  const [incomeFilter, setIncomeFilter] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    showAll: false
+  });
 
 
   useEffect(() => {
