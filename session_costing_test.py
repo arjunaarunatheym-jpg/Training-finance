@@ -272,38 +272,36 @@ class SessionCostingTestRunner:
             
         headers = {'Authorization': f'Bearer {self.admin_token}'}
         
-        # Sample expenses data
-        expenses_data = {
-            "expenses": [
-                {
-                    "category": "accommodation",
-                    "description": "Hotel accommodation for trainers",
-                    "expense_type": "fixed",
-                    "actual_amount": 200.0,
-                    "quantity": 2,
-                    "unit_price": 100.0,
-                    "remark": "2 nights accommodation"
-                },
-                {
-                    "category": "allowance",
-                    "description": "Meal allowance",
-                    "expense_type": "fixed", 
-                    "actual_amount": 150.0,
-                    "quantity": 3,
-                    "unit_price": 50.0,
-                    "remark": "Meal allowance for 3 people"
-                },
-                {
-                    "category": "petrol",
-                    "description": "Fuel costs",
-                    "expense_type": "fixed",
-                    "actual_amount": 150.0,
-                    "quantity": 1,
-                    "unit_price": 150.0,
-                    "remark": "Travel fuel costs"
-                }
-            ]
-        }
+        # Sample expenses data - API expects List[dict] directly
+        expenses_data = [
+            {
+                "category": "accommodation",
+                "description": "Hotel accommodation for trainers",
+                "expense_type": "fixed",
+                "actual_amount": 200.0,
+                "quantity": 2,
+                "unit_price": 100.0,
+                "remark": "2 nights accommodation"
+            },
+            {
+                "category": "allowance",
+                "description": "Meal allowance",
+                "expense_type": "fixed", 
+                "actual_amount": 150.0,
+                "quantity": 3,
+                "unit_price": 50.0,
+                "remark": "Meal allowance for 3 people"
+            },
+            {
+                "category": "petrol",
+                "description": "Fuel costs",
+                "expense_type": "fixed",
+                "actual_amount": 150.0,
+                "quantity": 1,
+                "unit_price": 150.0,
+                "remark": "Travel fuel costs"
+            }
+        ]
         
         try:
             response = self.session.post(f"{BASE_URL}/finance/session/{self.session_id}/expenses", 
@@ -313,7 +311,7 @@ class SessionCostingTestRunner:
                 data = response.json()
                 self.log(f"✅ Expenses saved successfully")
                 self.log(f"   Message: {data.get('message', 'N/A')}")
-                total_expenses = sum(expense['actual_amount'] for expense in expenses_data['expenses'])
+                total_expenses = sum(expense['actual_amount'] for expense in expenses_data)
                 self.log(f"   Total expenses: RM {total_expenses}")
                 return True
             else:
