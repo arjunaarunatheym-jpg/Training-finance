@@ -7617,6 +7617,60 @@ async def get_session_costing(session_id: str, current_user: User = Depends(get_
         "profit_percentage": round(profit_percentage, 2)
     }
 
+@api_router.post("/finance/session/{session_id}/invoice")
+async def save_session_invoice(session_id: str, invoice_data: dict, current_user: User = Depends(get_current_user)):
+    """Save or update invoice for a session (create if not exists)"""
+    if current_user.role not in ["admin", "super_admin", "finance", "coordinator"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Check if invoice exists for this session
+    existing = await db.invoices.find_one({"session_id": session_id}, {"_id": 0})
+    
+    now = get_malaysia_time()
+    
+    if existing:
+        # Update existing invoice
+        update_dict = {
+            "pricing_type": invoice_data.get("pricing_type", "lumpsum"),
+            "line_items": invoice_data.get("line_items", []),
+            "subtotal": invoice_data.get("subtotal", 0),
+            "tax_rate": invoice_data.get("tax_rate", 0),
+            "tax_amount": invoice_data.get("tax_amount", 0),
+            "total_amount": invoice_data.get("total_amount", 0),
+            "updated_at": now.isoformat()
+        }
+        await db.invoices.update_one({"id": existing["id"]}, {"$set": update_dict})
+        return {"message": "Invoice updated", "invoice_id": existing["id"]}
+    else:
+        # Create new invoice
+        invoice_number = await generate_invoice_number()
+        company = await db.companies.find_one({"id": session.get("company_id")}, {"_id": 0, "name": 1})
+        
+        invoice = {
+            "id": str(uuid.uuid4()),
+            "invoice_number": invoice_number,
+            "session_id": session_id,
+            "company_id": session.get("company_id"),
+            "company_name": company.get("name") if company else None,
+            "session_name": session.get("name"),
+            "pricing_type": invoice_data.get("pricing_type", "lumpsum"),
+            "line_items": invoice_data.get("line_items", []),
+            "subtotal": invoice_data.get("subtotal", 0),
+            "tax_rate": invoice_data.get("tax_rate", 0),
+            "tax_amount": invoice_data.get("tax_amount", 0),
+            "total_amount": invoice_data.get("total_amount", 0),
+            "status": "draft",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "created_by": current_user.id
+        }
+        await db.invoices.insert_one(invoice)
+        return {"message": "Invoice created", "invoice_id": invoice["id"], "invoice_number": invoice_number}
+
 @api_router.post("/finance/session/{session_id}/trainer-fees")
 async def save_trainer_fees(session_id: str, fees: List[dict], current_user: User = Depends(get_current_user)):
     """Save trainer fees for a session"""
