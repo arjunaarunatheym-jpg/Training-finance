@@ -7339,7 +7339,7 @@ async def get_trainer_income(trainer_id: str, current_user: User = Depends(get_c
 
 @api_router.get("/finance/income/coordinator/{coordinator_id}")
 async def get_coordinator_income(coordinator_id: str, current_user: User = Depends(get_current_user)):
-    """Get coordinator income"""
+    """Get coordinator income from all sessions"""
     if current_user.role == "coordinator" and current_user.id != coordinator_id:
         if "coordinator" not in (current_user.additional_roles or []):
             raise HTTPException(status_code=403, detail="Can only view your own income")
@@ -7350,14 +7350,19 @@ async def get_coordinator_income(coordinator_id: str, current_user: User = Depen
     
     records = await db.coordinator_fees.find({"coordinator_id": coordinator_id}, {"_id": 0}).to_list(1000)
     
+    # Enrich with session details
     for record in records:
-        session = await db.sessions.find_one({"id": record.get("session_id")}, {"_id": 0, "name": 1, "start_date": 1, "end_date": 1})
+        session = await db.sessions.find_one({"id": record.get("session_id")}, {"_id": 0, "name": 1, "start_date": 1, "end_date": 1, "company_id": 1})
         if session:
             record["session_name"] = session.get("name")
             record["training_dates"] = f"{session.get('start_date')} to {session.get('end_date')}"
+            # Get company name
+            company = await db.companies.find_one({"id": session.get("company_id")}, {"_id": 0, "name": 1})
+            record["company_name"] = company.get("name") if company else None
+        record["amount"] = record.get("total_fee", 0)  # Map total_fee to amount for consistency
     
-    total = sum(r.get("amount", 0) for r in records)
-    paid = sum(r.get("amount", 0) for r in records if r.get("status") == "paid")
+    total = sum(r.get("total_fee", 0) for r in records)
+    paid = sum(r.get("total_fee", 0) for r in records if r.get("status") == "paid")
     
     return {"records": records, "summary": {"total_fees": total, "paid_fees": paid, "pending_fees": total - paid}}
 
