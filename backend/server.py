@@ -7520,6 +7520,12 @@ async def get_session_costing(session_id: str, current_user: User = Depends(get_
     # Get trainer fees (from saved fees or from session assignments)
     trainer_fees = await db.trainer_fees.find({"session_id": session_id}, {"_id": 0}).to_list(100)
     
+    # Enrich trainer fees with trainer names if missing
+    for fee in trainer_fees:
+        if not fee.get("trainer_name"):
+            trainer = await db.users.find_one({"id": fee.get("trainer_id")}, {"_id": 0, "full_name": 1})
+            fee["trainer_name"] = trainer.get("full_name") if trainer else "Unknown Trainer"
+    
     # If no fees saved yet, populate from session trainer_assignments
     if not trainer_fees and session.get("trainer_assignments"):
         for ta in session.get("trainer_assignments", []):
