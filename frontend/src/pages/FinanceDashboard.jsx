@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { axiosInstance } from '../App';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { 
-  DollarSign, FileText, CreditCard, Users, TrendingUp, 
+  DollarSign, FileText, CreditCard, TrendingUp, 
   CheckCircle, Clock, AlertCircle, LogOut, RefreshCw,
-  Eye, Check, X, Calendar, Building, Receipt
+  Check, X, Plus, FileX, Receipt
 } from 'lucide-react';
 
 const FinanceDashboard = ({ user, onLogout }) => {
@@ -20,12 +22,29 @@ const FinanceDashboard = ({ user, onLogout }) => {
   const [payments, setPayments] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('pending');
+  
+  // Payment form state
+  const [paymentForm, setPaymentForm] = useState({
+    invoice_id: '',
+    amount: '',
+    payment_date: new Date().toISOString().split('T')[0],
+    payment_method: 'bank_transfer',
+    reference_number: '',
+    notes: '',
+    create_cn: false,
+    cn_percentage: '4',
+    cn_reason: 'HRDCorp Levy Deduction'
+  });
+  const [pendingInvoices, setPendingInvoices] = useState([]);
+  const [creditNotes, setCreditNotes] = useState([]);
+  const [showCNDialog, setShowCNDialog] = useState(false);
 
   useEffect(() => {
     loadDashboard();
     loadInvoices();
+    loadPendingInvoices();
+    loadCreditNotes();
   }, []);
 
   const loadDashboard = async () => {
@@ -40,13 +59,32 @@ const FinanceDashboard = ({ user, onLogout }) => {
   const loadInvoices = async () => {
     setLoading(true);
     try {
-      const url = statusFilter === 'all' ? '/finance/invoices' : `/finance/invoices?status=${statusFilter}`;
-      const response = await axiosInstance.get(url);
+      const response = await axiosInstance.get('/finance/invoices');
       setInvoices(response.data);
     } catch (error) {
       toast.error('Failed to load invoices');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPendingInvoices = async () => {
+    try {
+      const response = await axiosInstance.get('/finance/invoices');
+      // Filter to show only issued invoices (ready for payment)
+      const pending = response.data.filter(inv => inv.status === 'issued' || inv.status === 'approved');
+      setPendingInvoices(pending);
+    } catch (error) {
+      console.error('Failed to load pending invoices');
+    }
+  };
+
+  const loadCreditNotes = async () => {
+    try {
+      const response = await axiosInstance.get('/finance/credit-notes');
+      setCreditNotes(response.data);
+    } catch (error) {
+      console.error('Failed to load credit notes');
     }
   };
 
@@ -59,12 +97,22 @@ const FinanceDashboard = ({ user, onLogout }) => {
     }
   };
 
+  const loadPayments = async () => {
+    try {
+      const response = await axiosInstance.get('/finance/payments');
+      setPayments(response.data);
+    } catch (error) {
+      console.error('Failed to load payments');
+    }
+  };
+
   const handleApproveInvoice = async (invoiceId) => {
     try {
       await axiosInstance.post(`/finance/invoices/${invoiceId}/approve`);
       toast.success('Invoice approved');
       loadInvoices();
       loadDashboard();
+      loadPendingInvoices();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to approve invoice');
     }
@@ -76,6 +124,7 @@ const FinanceDashboard = ({ user, onLogout }) => {
       toast.success('Invoice issued');
       loadInvoices();
       loadDashboard();
+      loadPendingInvoices();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to issue invoice');
     }
@@ -90,14 +139,85 @@ const FinanceDashboard = ({ user, onLogout }) => {
       toast.success('Invoice cancelled');
       loadInvoices();
       loadDashboard();
+      loadPendingInvoices();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to cancel invoice');
     }
   };
 
+  const handleRecordPayment = async () => {
+    if (!paymentForm.invoice_id) {
+      toast.error('Please select an invoice');
+      return;
+    }
+    if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    try {
+      // Record the payment
+      await axiosInstance.post('/finance/payments', {
+        invoice_id: paymentForm.invoice_id,
+        amount: parseFloat(paymentForm.amount),
+        payment_date: paymentForm.payment_date,
+        payment_method: paymentForm.payment_method,
+        reference_number: paymentForm.reference_number,
+        notes: paymentForm.notes
+      });
+
+      // If CN checkbox is checked, create credit note
+      if (paymentForm.create_cn) {
+        const selectedInvoice = pendingInvoices.find(inv => inv.id === paymentForm.invoice_id);
+        if (selectedInvoice) {
+          await axiosInstance.post(`/finance/session/${selectedInvoice.session_id}/credit-note`, {
+            reason: paymentForm.cn_reason,
+            description: `${paymentForm.cn_percentage}% deduction`,
+            percentage: parseFloat(paymentForm.cn_percentage),
+            base_amount: selectedInvoice.total_amount
+          });
+          toast.success('Credit Note created');
+        }
+      }
+
+      toast.success('Payment recorded successfully');
+      
+      // Reset form
+      setPaymentForm({
+        invoice_id: '',
+        amount: '',
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: 'bank_transfer',
+        reference_number: '',
+        notes: '',
+        create_cn: false,
+        cn_percentage: '4',
+        cn_reason: 'HRDCorp Levy Deduction'
+      });
+      
+      loadInvoices();
+      loadDashboard();
+      loadPendingInvoices();
+      loadPayments();
+      loadCreditNotes();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to record payment');
+    }
+  };
+
+  const handleInvoiceSelect = (invoiceId) => {
+    const selected = pendingInvoices.find(inv => inv.id === invoiceId);
+    setPaymentForm({
+      ...paymentForm,
+      invoice_id: invoiceId,
+      amount: selected?.total_amount?.toString() || ''
+    });
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       auto_draft: { color: 'bg-gray-500', label: 'Draft' },
+      draft: { color: 'bg-gray-500', label: 'Draft' },
       finance_review: { color: 'bg-yellow-500', label: 'Under Review' },
       approved: { color: 'bg-blue-500', label: 'Approved' },
       issued: { color: 'bg-purple-500', label: 'Issued' },
@@ -107,6 +227,13 @@ const FinanceDashboard = ({ user, onLogout }) => {
     const config = statusConfig[status] || { color: 'bg-gray-400', label: status };
     return <Badge className={`${config.color} text-white`}>{config.label}</Badge>;
   };
+
+  // Filter invoices based on status
+  const filteredInvoices = statusFilter === 'all' 
+    ? invoices 
+    : statusFilter === 'pending' 
+      ? invoices.filter(inv => !['paid', 'cancelled'].includes(inv.status))
+      : invoices.filter(inv => inv.status === statusFilter);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,111 +260,121 @@ const FinanceDashboard = ({ user, onLogout }) => {
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard">
-            {dashboard && (
-              <div className="space-y-6">
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-500">Total Invoices</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{dashboard.invoices.total}</div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {dashboard.invoices.draft} draft, {dashboard.invoices.issued} issued
-                      </p>
-                    </CardContent>
-                  </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-700 flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Total Invoices
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {dashboard?.total_invoices || 0}
+                  </div>
+                  <p className="text-sm text-blue-600">
+                    RM {(dashboard?.total_invoiced || 0).toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-green-700 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Collected
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-900">
+                    RM {(dashboard?.total_collected || 0).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-green-600">
+                    {dashboard?.paid_invoices || 0} invoices paid
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-orange-700 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Outstanding
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-900">
+                    RM {(dashboard?.outstanding || 0).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-orange-600">
+                    {dashboard?.pending_invoices || 0} pending
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Payables
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-900">
+                    RM {((dashboard?.pending_trainer_fees || 0) + (dashboard?.pending_coordinator_fees || 0)).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-purple-600">
+                    Staff payments pending
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-500">Total Issued</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-blue-600">
-                        RM {dashboard.financials.total_issued.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-500">Collected</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        RM {dashboard.financials.total_collected.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-500">Outstanding</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-orange-600">
-                        RM {dashboard.financials.outstanding_receivables.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 flex-wrap">
+                  <Button onClick={() => setActiveTab('payments')} className="bg-green-600 hover:bg-green-700">
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Record Payment
+                  </Button>
+                  <Button variant="outline" onClick={() => setActiveTab('credit-notes')}>
+                    <FileX className="w-4 h-4 mr-2" />
+                    View Credit Notes
+                  </Button>
+                  <Button variant="outline" onClick={() => { loadInvoices(); loadDashboard(); }}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Data
+                  </Button>
                 </div>
-
-                {/* Invoice Status Overview */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Invoice Status Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      <div className="text-center p-4 bg-gray-100 rounded-lg">
-                        <div className="text-2xl font-bold">{dashboard.invoices.draft}</div>
-                        <div className="text-sm text-gray-500">Draft</div>
-                      </div>
-                      <div className="text-center p-4 bg-blue-100 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{dashboard.invoices.approved}</div>
-                        <div className="text-sm text-blue-600">Approved</div>
-                      </div>
-                      <div className="text-center p-4 bg-purple-100 rounded-lg">
-                        <div className="text-2xl font-bold text-purple-600">{dashboard.invoices.issued}</div>
-                        <div className="text-sm text-purple-600">Issued</div>
-                      </div>
-                      <div className="text-center p-4 bg-green-100 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{dashboard.invoices.paid}</div>
-                        <div className="text-sm text-green-600">Paid</div>
-                      </div>
-                      <div className="text-center p-4 bg-orange-100 rounded-lg">
-                        <div className="text-2xl font-bold text-orange-600">
-                          RM {dashboard.payables.pending_total.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-orange-600">Pending Payables</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Invoices Tab */}
           <TabsContent value="invoices">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>Invoices</CardTitle>
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                  <CardTitle>Invoice Management</CardTitle>
                   <div className="flex gap-2">
-                    <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); }}>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="auto_draft">Draft</SelectItem>
+                        <SelectItem value="all">All Invoices</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="approved">Approved</SelectItem>
                         <SelectItem value="issued">Issued</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
@@ -252,49 +389,39 @@ const FinanceDashboard = ({ user, onLogout }) => {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading...</div>
-                ) : invoices.length === 0 ? (
+                  <div className="text-center py-8">Loading invoices...</div>
+                ) : filteredInvoices.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No invoices found</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-2">Invoice #</th>
-                          <th className="text-left py-3 px-2">Company</th>
-                          <th className="text-left py-3 px-2">Programme</th>
-                          <th className="text-left py-3 px-2">Dates</th>
-                          <th className="text-right py-3 px-2">Amount</th>
-                          <th className="text-center py-3 px-2">Status</th>
-                          <th className="text-center py-3 px-2">Actions</th>
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Invoice #</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Company</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Session</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">Amount</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-500">Status</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-500">Actions</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {invoices.map((invoice) => (
-                          <tr key={invoice.id} className="border-b hover:bg-gray-50">
-                            <td className="py-3 px-2 font-mono text-sm">{invoice.invoice_number}</td>
-                            <td className="py-3 px-2">{invoice.company_name || '-'}</td>
-                            <td className="py-3 px-2">{invoice.programme_name || '-'}</td>
-                            <td className="py-3 px-2 text-sm">{invoice.training_dates || '-'}</td>
-                            <td className="py-3 px-2 text-right font-medium">
-                              RM {invoice.total_amount?.toLocaleString() || '0'}
-                            </td>
-                            <td className="py-3 px-2 text-center">{getStatusBadge(invoice.status)}</td>
-                            <td className="py-3 px-2">
+                      <tbody className="divide-y divide-gray-200">
+                        {filteredInvoices.map((invoice) => (
+                          <tr key={invoice.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium">{invoice.invoice_number}</td>
+                            <td className="px-4 py-3 text-sm">{invoice.company_name || '-'}</td>
+                            <td className="px-4 py-3 text-sm">{invoice.session_name || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium">RM {invoice.total_amount?.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center">{getStatusBadge(invoice.status)}</td>
+                            <td className="px-4 py-3 text-center">
                               <div className="flex justify-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => setSelectedInvoice(invoice)}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                {['auto_draft', 'finance_review'].includes(invoice.status) && (
+                                {(invoice.status === 'auto_draft' || invoice.status === 'draft') && (
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
                                     className="text-green-600"
                                     onClick={() => handleApproveInvoice(invoice.id)}
+                                    title="Approve"
                                   >
                                     <Check className="w-4 h-4" />
                                   </Button>
@@ -305,8 +432,23 @@ const FinanceDashboard = ({ user, onLogout }) => {
                                     size="sm"
                                     className="text-blue-600"
                                     onClick={() => handleIssueInvoice(invoice.id)}
+                                    title="Issue"
                                   >
                                     <FileText className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {invoice.status === 'issued' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-green-600"
+                                    onClick={() => {
+                                      handleInvoiceSelect(invoice.id);
+                                      setActiveTab('payments');
+                                    }}
+                                    title="Record Payment"
+                                  >
+                                    <CreditCard className="w-4 h-4" />
                                   </Button>
                                 )}
                                 {!['paid', 'cancelled'].includes(invoice.status) && (
@@ -315,6 +457,7 @@ const FinanceDashboard = ({ user, onLogout }) => {
                                     size="sm"
                                     className="text-red-600"
                                     onClick={() => handleCancelInvoice(invoice.id)}
+                                    title="Cancel"
                                   >
                                     <X className="w-4 h-4" />
                                   </Button>
@@ -333,44 +476,62 @@ const FinanceDashboard = ({ user, onLogout }) => {
 
           {/* Payments Tab */}
           <TabsContent value="payments">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Records</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium">Record Payment</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Record Payment Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-green-600" />
+                    Record Payment
+                  </CardTitle>
+                  <CardDescription>Record payment received for an invoice</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Select Invoice (Pending Only)</Label>
+                    <Select value={paymentForm.invoice_id} onValueChange={handleInvoiceSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an invoice to pay" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pendingInvoices.length === 0 ? (
+                          <SelectItem value="" disabled>No pending invoices</SelectItem>
+                        ) : (
+                          pendingInvoices.map(inv => (
+                            <SelectItem key={inv.id} value={inv.id}>
+                              {inv.invoice_number} - {inv.company_name || inv.session_name} (RM {inv.total_amount?.toLocaleString()})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Invoice Number
-                      </label>
-                      <Input placeholder="Enter invoice number" />
+                      <Label>Payment Amount (RM)</Label>
+                      <Input 
+                        type="number" 
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
+                        placeholder="0.00"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Amount
-                      </label>
-                      <Input type="number" placeholder="0.00" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Date
-                      </label>
-                      <Input type="date" />
+                      <Label>Payment Date</Label>
+                      <Input 
+                        type="date" 
+                        value={paymentForm.payment_date}
+                        onChange={(e) => setPaymentForm({...paymentForm, payment_date: e.target.value})}
+                      />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Payment Method
-                      </label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment method" />
-                        </SelectTrigger>
+                      <Label>Payment Method</Label>
+                      <Select value={paymentForm.payment_method} onValueChange={(v) => setPaymentForm({...paymentForm, payment_method: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                           <SelectItem value="cheque">Cheque</SelectItem>
@@ -380,28 +541,181 @@ const FinanceDashboard = ({ user, onLogout }) => {
                       </Select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Reference Number
-                      </label>
-                      <Input placeholder="Transaction/Reference number" />
+                      <Label>Reference Number</Label>
+                      <Input 
+                        value={paymentForm.reference_number}
+                        onChange={(e) => setPaymentForm({...paymentForm, reference_number: e.target.value})}
+                        placeholder="Transaction ref"
+                      />
                     </div>
                   </div>
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Notes (Optional)
-                    </label>
-                    <Input placeholder="Additional notes about the payment" />
+                    <Label>Notes (Optional)</Label>
+                    <Input 
+                      value={paymentForm.notes}
+                      onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                      placeholder="Additional notes"
+                    />
                   </div>
+                  
+                  {/* Credit Note Option */}
+                  <div className="p-4 bg-red-50 rounded-lg border border-red-200 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        id="create-cn"
+                        checked={paymentForm.create_cn}
+                        onChange={(e) => setPaymentForm({...paymentForm, create_cn: e.target.checked})}
+                      />
+                      <Label htmlFor="create-cn" className="text-red-700 font-medium">
+                        Create Credit Note (e.g., HRDCorp deduction)
+                      </Label>
+                    </div>
+                    {paymentForm.create_cn && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm">Deduction %</Label>
+                          <Input 
+                            type="number" 
+                            value={paymentForm.cn_percentage}
+                            onChange={(e) => setPaymentForm({...paymentForm, cn_percentage: e.target.value})}
+                            placeholder="4"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm">Reason</Label>
+                          <Input 
+                            value={paymentForm.cn_reason}
+                            onChange={(e) => setPaymentForm({...paymentForm, cn_reason: e.target.value})}
+                            placeholder="HRDCorp Levy"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex gap-2">
-                    <Button className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleRecordPayment} className="bg-green-600 hover:bg-green-700 flex-1">
                       <CreditCard className="w-4 h-4 mr-2" />
                       Record Payment
                     </Button>
-                    <Button variant="outline">
-                      Clear Form
+                    <Button variant="outline" onClick={() => setPaymentForm({
+                      invoice_id: '',
+                      amount: '',
+                      payment_date: new Date().toISOString().split('T')[0],
+                      payment_method: 'bank_transfer',
+                      reference_number: '',
+                      notes: '',
+                      create_cn: false,
+                      cn_percentage: '4',
+                      cn_reason: 'HRDCorp Levy Deduction'
+                    })}>
+                      Clear
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Payments */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Recent Payments</CardTitle>
+                    <Button variant="outline" size="sm" onClick={loadPayments}>
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {payments.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Receipt className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p>No payments recorded yet</p>
+                      <Button variant="outline" size="sm" className="mt-2" onClick={loadPayments}>
+                        Load Payments
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {payments.slice(0, 10).map((payment) => (
+                        <div key={payment.id} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{payment.invoice_number}</p>
+                              <p className="text-sm text-gray-500">{payment.payment_date}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-green-600">RM {payment.amount?.toLocaleString()}</p>
+                              <p className="text-xs text-gray-500">{payment.payment_method}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Credit Notes Tab */}
+          <TabsContent value="credit-notes">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileX className="w-5 h-5 text-red-600" />
+                      Credit Notes
+                    </CardTitle>
+                    <CardDescription>Track deductions like HRDCorp levy</CardDescription>
+                  </div>
+                  <Button variant="outline" onClick={loadCreditNotes}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
                 </div>
+              </CardHeader>
+              <CardContent>
+                {creditNotes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileX className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>No credit notes yet</p>
+                    <p className="text-sm">Credit notes are created when recording payments with deductions</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">CN Number</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Invoice</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Company</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Reason</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">Amount</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-500">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {creditNotes.map((cn) => (
+                          <tr key={cn.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-red-600">{cn.cn_number}</td>
+                            <td className="px-4 py-3 text-sm">{cn.invoice_number || '-'}</td>
+                            <td className="px-4 py-3 text-sm">{cn.company_name || '-'}</td>
+                            <td className="px-4 py-3 text-sm">{cn.reason}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-red-600">- RM {cn.amount?.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-center">
+                              <Badge className={cn.status === 'approved' ? 'bg-green-500' : 'bg-yellow-500'}>
+                                {cn.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -421,18 +735,22 @@ const FinanceDashboard = ({ user, onLogout }) => {
               <CardContent>
                 {auditLogs.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    Click "Load Logs" to view audit history
+                    <p>Click 'Load Logs' to view audit history</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {auditLogs.map((log) => (
-                      <div key={log.id} className="p-3 bg-gray-50 rounded-lg text-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{log.action} - {log.entity_type}</span>
-                          <span className="text-gray-500">{new Date(log.timestamp).toLocaleString()}</span>
+                  <div className="space-y-3">
+                    {auditLogs.map((log, idx) => (
+                      <div key={log.id || idx} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{log.action} - {log.entity_type}</p>
+                            <p className="text-sm text-gray-500">By: {log.changed_by_name}</p>
+                            {log.remark && <p className="text-sm text-gray-400">{log.remark}</p>}
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
+                          </p>
                         </div>
-                        <div className="text-gray-600">By: {log.changed_by_name}</div>
-                        {log.reason && <div className="text-gray-500">Reason: {log.reason}</div>}
                       </div>
                     ))}
                   </div>
@@ -441,66 +759,6 @@ const FinanceDashboard = ({ user, onLogout }) => {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Invoice Detail Modal */}
-        {selectedInvoice && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-xl font-bold">{selectedInvoice.invoice_number}</h2>
-                  {getStatusBadge(selectedInvoice.status)}
-                </div>
-                <Button variant="ghost" onClick={() => setSelectedInvoice(null)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-sm text-gray-500">Company</p>
-                  <p className="font-medium">{selectedInvoice.company_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Programme</p>
-                  <p className="font-medium">{selectedInvoice.programme_name || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Training Dates</p>
-                  <p className="font-medium">{selectedInvoice.training_dates || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Venue</p>
-                  <p className="font-medium">{selectedInvoice.venue || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">PAX</p>
-                  <p className="font-medium">{selectedInvoice.pax}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Amount</p>
-                  <p className="font-medium text-lg">RM {selectedInvoice.total_amount?.toLocaleString() || '0'}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2 mt-6">
-                {['auto_draft', 'finance_review'].includes(selectedInvoice.status) && (
-                  <Button onClick={() => { handleApproveInvoice(selectedInvoice.id); setSelectedInvoice(null); }}>
-                    Approve Invoice
-                  </Button>
-                )}
-                {selectedInvoice.status === 'approved' && (
-                  <Button onClick={() => { handleIssueInvoice(selectedInvoice.id); setSelectedInvoice(null); }}>
-                    Issue Invoice
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => setSelectedInvoice(null)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );
