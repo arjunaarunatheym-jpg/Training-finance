@@ -809,3 +809,15 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "Implemented Session Costing integration in AdminDashboard. Added Costing button to session cards, modal opens correctly. Fixed trainer name display. Needs comprehensive testing of: 1) Form inputs and validation, 2) Save functionality for all sections (invoice, trainer fees, coordinator fee, expenses, marketing), 3) Profit calculation accuracy, 4) Data persistence after save and modal reopen."
+
+  - task: "Session Costing Backend APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ SESSION COSTING API ENDPOINTS - ALL WORKING! 10/11 tests passed (91% success rate). Verified: GET /api/finance/session/{session_id}/costing - returns complete costing breakdown, GET /api/finance/expense-categories - returns 10 categories, GET /api/finance/marketing-users - returns marketing users list, POST /api/finance/session/{session_id}/trainer-fees - saves trainer fees successfully, POST /api/finance/session/{session_id}/coordinator-fee - saves coordinator fee, POST /api/finance/session/{session_id}/expenses - saves expenses, POST /api/finance/session/{session_id}/marketing - saves marketing commission. Data persistence verified - all saved data correctly reflects in subsequent API calls. Authentication properly enforced."
