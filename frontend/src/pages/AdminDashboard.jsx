@@ -1819,44 +1819,117 @@ const AdminDashboard = ({ user, onLogout }) => {
                             <DollarSign className="w-5 h-5 text-green-600" />
                             Marketing Commission (Optional)
                           </h3>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Marketing Person</Label>
-                              <Select
-                                value={sessionForm.marketing_user_id || "none"}
-                                onValueChange={(value) => setSessionForm({ ...sessionForm, marketing_user_id: value === "none" ? "" : value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select marketing person" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">None</SelectItem>
-                                  {marketingUsers.map((user) => (
-                                    <SelectItem key={user.id} value={user.id}>
-                                      {user.full_name} ({user.role}{user.additional_roles?.includes("marketing") ? " + Marketing" : ""})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Commission Type</Label>
-                              <Select
-                                value={sessionForm.commission_type}
-                                onValueChange={(value) => setSessionForm({ ...sessionForm, commission_type: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="percentage">Percentage (%)</SelectItem>
-                                  <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                          
+                          {/* Create New Marketing Person Checkbox */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="create-new-marketing"
+                              checked={sessionForm.create_new_marketing}
+                              onChange={(e) => setSessionForm({ 
+                                ...sessionForm, 
+                                create_new_marketing: e.target.checked,
+                                marketing_user_id: e.target.checked ? "" : sessionForm.marketing_user_id 
+                              })}
+                            />
+                            <Label htmlFor="create-new-marketing">Create new marketing person</Label>
                           </div>
-                          {sessionForm.marketing_user_id && (
+                          
+                          {sessionForm.create_new_marketing ? (
+                            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                              <div>
+                                <Label>Full Name *</Label>
+                                <Input
+                                  value={sessionForm.new_marketing_name}
+                                  onChange={(e) => setSessionForm({ ...sessionForm, new_marketing_name: e.target.value })}
+                                  placeholder="Marketing person name"
+                                />
+                              </div>
+                              <div>
+                                <Label>IC Number * (will be user ID)</Label>
+                                <Input
+                                  value={sessionForm.new_marketing_id}
+                                  onChange={(e) => setSessionForm({ ...sessionForm, new_marketing_id: e.target.value })}
+                                  placeholder="IC number (e.g. 890101-12-5678)"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Default password: mddrc1</p>
+                              </div>
+                            </div>
+                          ) : (
                             <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label>Marketing Person</Label>
+                                <Select
+                                  value={sessionForm.marketing_user_id || "none"}
+                                  onValueChange={(value) => setSessionForm({ ...sessionForm, marketing_user_id: value === "none" ? "" : value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select marketing person" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {marketingUsers.map((user) => (
+                                      <SelectItem key={user.id} value={user.id}>
+                                        {user.full_name} ({user.role}{user.additional_roles?.includes("marketing") ? " + Marketing" : ""})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label>Commission Type</Label>
+                                <Select
+                                  value={sessionForm.commission_type}
+                                  onValueChange={(value) => setSessionForm({ ...sessionForm, commission_type: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                    <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {(sessionForm.marketing_user_id || sessionForm.create_new_marketing) && (
+                            <div className="grid grid-cols-2 gap-4">
+                              {!sessionForm.create_new_marketing && (
+                                <div>
+                                  <Label>Commission Type</Label>
+                                  <Select
+                                    value={sessionForm.commission_type}
+                                    onValueChange={(value) => setSessionForm({ ...sessionForm, commission_type: value })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="percentage">Percentage of Profit</SelectItem>
+                                      <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              {sessionForm.create_new_marketing && (
+                                <div>
+                                  <Label>Commission Type</Label>
+                                  <Select
+                                    value={sessionForm.commission_type}
+                                    onValueChange={(value) => setSessionForm({ ...sessionForm, commission_type: value })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="percentage">Percentage of Profit</SelectItem>
+                                      <SelectItem value="fixed">Fixed Amount (RM)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                               {sessionForm.commission_type === "percentage" ? (
                                 <div>
                                   <Label>Commission Rate (%)</Label>
@@ -1867,8 +1940,9 @@ const AdminDashboard = ({ user, onLogout }) => {
                                     step="0.1"
                                     value={sessionForm.commission_rate}
                                     onChange={(e) => setSessionForm({ ...sessionForm, commission_rate: e.target.value })}
-                                    placeholder="e.g. 5"
+                                    placeholder="e.g. 10"
                                   />
+                                  <p className="text-xs text-gray-500 mt-1">% of NET profit (after all expenses)</p>
                                 </div>
                               ) : (
                                 <div>
