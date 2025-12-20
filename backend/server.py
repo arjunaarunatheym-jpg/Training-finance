@@ -7522,12 +7522,18 @@ async def get_session_costing(session_id: str, current_user: User = Depends(get_
     
     # Enrich trainer fees with trainer names if missing
     for fee in trainer_fees:
-        if not fee.get("trainer_name"):
-            trainer = await db.users.find_one({"id": fee.get("trainer_id")}, {"_id": 0, "full_name": 1})
-            fee["trainer_name"] = trainer.get("full_name") if trainer else "Unknown Trainer"
+        if not fee.get("trainer_name") or fee.get("trainer_name") == "Unknown Trainer":
+            if fee.get("trainer_id"):
+                trainer = await db.users.find_one({"id": fee.get("trainer_id")}, {"_id": 0, "full_name": 1})
+                fee["trainer_name"] = trainer.get("full_name") if trainer else "Unknown Trainer"
     
-    # If no fees saved yet, populate from session trainer_assignments
-    if not trainer_fees and session.get("trainer_assignments"):
+    # Check if we have valid trainer fees (with trainer_ids matching session trainers)
+    session_trainer_ids = [ta.get("trainer_id") for ta in session.get("trainer_assignments", [])]
+    valid_fees = [f for f in trainer_fees if f.get("trainer_id") in session_trainer_ids]
+    
+    # If no valid fees, populate from session trainer_assignments
+    if not valid_fees and session.get("trainer_assignments"):
+        trainer_fees = []  # Clear any corrupt fees
         for ta in session.get("trainer_assignments", []):
             trainer = await db.users.find_one({"id": ta.get("trainer_id")}, {"_id": 0, "full_name": 1})
             trainer_fees.append({
