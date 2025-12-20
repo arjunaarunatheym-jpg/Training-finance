@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { axiosInstance } from '../App';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { 
   DollarSign, Users, Truck, Calculator, Plus, Trash2, Save, 
-  FileText, TrendingUp, User, Building2, Calendar
+  FileText, TrendingUp, User, Building2, Calendar, RefreshCw
 } from 'lucide-react';
 
 const SessionCosting = ({ session, onClose, onUpdate }) => {
@@ -17,13 +17,14 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
   const [saving, setSaving] = useState(false);
   const [costing, setCosting] = useState(null);
   const [expenseCategories, setExpenseCategories] = useState([]);
+  const [invoiceId, setInvoiceId] = useState(null);
   
   // Form states
   const [invoiceData, setInvoiceData] = useState({
     pricing_type: 'lumpsum',
     lumpsum_amount: '',
     per_pax_rate: '',
-    tax_rate: '',
+    tax_rate: '6', // Default SST 6%
   });
   
   const [trainerFees, setTrainerFees] = useState([]);
@@ -40,84 +41,105 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
   });
   const [marketingUsers, setMarketingUsers] = useState([]);
 
-  useEffect(() => {
-    loadData();
-  }, [session.id]);
+  // Calculate total headcount (participants + trainers + coordinator)
+  const getTotalHeadcount = useCallback(() => {
+    const participantCount = costing?.pax || session?.participant_ids?.length || 0;
+    const trainerCount = session?.trainer_assignments?.length || 0;
+    const coordinatorCount = session?.coordinator_id ? 1 : 0;
+    return participantCount + trainerCount + coordinatorCount;
+  }, [costing, session]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [costingRes, categoriesRes, marketingUsersRes] = await Promise.all([
+      const [costingRes, categoriesRes, marketingUsersRes, invoicesRes] = await Promise.all([
         axiosInstance.get(`/finance/session/${session.id}/costing`),
         axiosInstance.get('/finance/expense-categories'),
-        axiosInstance.get('/finance/marketing-users').catch(() => ({ data: [] }))
+        axiosInstance.get('/finance/marketing-users').catch(() => ({ data: [] })),
+        axiosInstance.get('/finance/invoices').catch(() => ({ data: [] }))
       ]);
       
-      setCosting(costingRes.data);
+      const costingData = costingRes.data;
+      setCosting(costingData);
       setExpenseCategories(categoriesRes.data);
       setMarketingUsers(marketingUsersRes.data);
       
-      // Initialize trainer fees from session
-      if (session.trainer_assignments?.length > 0) {
-        const existingFees = costingRes.data.trainer_fees || [];
-        const fees = session.trainer_assignments.map(ta => {
-          const existing = existingFees.find(f => f.trainer_id === ta.trainer_id);
-          return {
-            trainer_id: ta.trainer_id,
-            trainer_name: existing?.trainer_name || ta.trainer_name || 'Unknown Trainer',
-            role: ta.role,
-            fee_amount: existing?.fee_amount || '',
-            remark: existing?.remark || ''
-          };
-        });
-        setTrainerFees(fees);
-      } else if (costingRes.data.trainer_fees?.length > 0) {
-        // If session doesn't have trainer_assignments but costing has trainer fees
-        setTrainerFees(costingRes.data.trainer_fees.map(f => ({
+      // Find invoice for this session
+      const sessionInvoice = invoicesRes.data.find(inv => inv.session_id === session.id);
+      if (sessionInvoice) {
+        setInvoiceId(sessionInvoice.id);
+        // Initialize invoice data from saved invoice
+        if (sessionInvoice.total_amount > 0) {
+          setInvoiceData({
+            pricing_type: sessionInvoice.pricing_type || 'lumpsum',
+            lumpsum_amount: sessionInvoice.total_amount?.toString() || '',
+            per_pax_rate: sessionInvoice.pricing_type === 'per_pax' ? 
+              (sessionInvoice.total_amount / (costingData.pax || 1))?.toString() : '',
+            tax_rate: sessionInvoice.tax_rate?.toString() || '6',
+          });
+        } else if (costingData.invoice_total > 0) {
+          // Fallback to costing data
+          setInvoiceData({
+            pricing_type: 'lumpsum',
+            lumpsum_amount: costingData.invoice_total?.toString() || '',
+            per_pax_rate: '',
+            tax_rate: costingData.less_tax > 0 ? 
+              ((costingData.less_tax / costingData.invoice_total) * 100).toFixed(1) : '6',
+          });
+        }
+      }
+      
+      // Initialize trainer fees
+      if (costingData.trainer_fees?.length > 0) {
+        setTrainerFees(costingData.trainer_fees.map(f => ({
           trainer_id: f.trainer_id,
           trainer_name: f.trainer_name || 'Unknown Trainer',
           role: f.role || 'trainer',
-          fee_amount: f.fee_amount || '',
+          fee_amount: f.fee_amount?.toString() || '',
           remark: f.remark || ''
+        })));
+      } else if (session.trainer_assignments?.length > 0) {
+        setTrainerFees(session.trainer_assignments.map(ta => ({
+          trainer_id: ta.trainer_id,
+          trainer_name: ta.trainer_name || 'Unknown Trainer',
+          role: ta.role,
+          fee_amount: '',
+          remark: ''
         })));
       }
       
       // Initialize coordinator fee
-      if (costingRes.data.coordinator_fee) {
-        setCoordinatorFee(costingRes.data.coordinator_fee);
+      if (costingData.coordinator_fee) {
+        setCoordinatorFee({
+          num_days: costingData.coordinator_fee.num_days || 1,
+          daily_rate: costingData.coordinator_fee.daily_rate || 50
+        });
       } else if (session.coordinator_id) {
-        // Calculate days from session dates
         const start = new Date(session.start_date);
         const end = new Date(session.end_date);
-        const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
         setCoordinatorFee({ num_days: days, daily_rate: 50 });
       }
       
       // Initialize expenses
-      if (costingRes.data.expenses?.length > 0) {
-        setExpenses(costingRes.data.expenses);
+      if (costingData.expenses?.length > 0) {
+        setExpenses(costingData.expenses.map(e => ({
+          ...e,
+          estimated_amount: e.estimated_amount?.toString() || '',
+          actual_amount: e.actual_amount?.toString() || ''
+        })));
       }
       
       // Initialize marketing
-      if (costingRes.data.marketing) {
+      if (costingData.marketing) {
         setMarketing({
-          marketing_user_id: costingRes.data.marketing.marketing_user_id,
-          commission_type: costingRes.data.marketing.commission_type,
-          commission_rate: costingRes.data.marketing.commission_rate || '',
-          fixed_amount: costingRes.data.marketing.fixed_amount || '',
+          marketing_user_id: costingData.marketing.marketing_user_id || '',
+          commission_type: costingData.marketing.commission_type || 'percentage',
+          commission_rate: costingData.marketing.commission_rate?.toString() || '',
+          fixed_amount: costingData.marketing.fixed_amount?.toString() || '',
           create_new: false,
           full_name: '',
           id_number: ''
-        });
-      }
-      
-      // Initialize invoice data
-      if (costingRes.data.invoice_total > 0) {
-        setInvoiceData({
-          pricing_type: 'lumpsum',
-          lumpsum_amount: costingRes.data.invoice_total,
-          per_pax_rate: '',
-          tax_rate: costingRes.data.less_tax > 0 ? (costingRes.data.less_tax / costingRes.data.invoice_total * 100).toFixed(1) : ''
         });
       }
       
@@ -127,14 +149,46 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
     } finally {
       setLoading(false);
     }
+  }, [session.id, session.coordinator_id, session.start_date, session.end_date, session.trainer_assignments, session.participant_ids]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Get invoice amount for calculations
+  const getInvoiceAmount = () => {
+    if (invoiceData.pricing_type === 'lumpsum') {
+      return parseFloat(invoiceData.lumpsum_amount) || 0;
+    } else {
+      return (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0);
+    }
   };
 
-  const addExpense = () => {
+  // Auto-calculate expense based on category
+  const calculateExpenseAmount = (category) => {
+    const cat = expenseCategories.find(c => c.id === category);
+    if (!cat) return 0;
+    
+    const invoiceAmount = getInvoiceAmount();
+    const headcount = getTotalHeadcount();
+    
+    if (cat.type === 'percentage' && cat.rate > 0) {
+      return (invoiceAmount * cat.rate / 100).toFixed(2);
+    } else if (cat.type === 'per_pax' && cat.rate > 0) {
+      return (headcount * cat.rate).toFixed(2);
+    }
+    return '';
+  };
+
+  const addExpense = (categoryId = '') => {
+    const cat = expenseCategories.find(c => c.id === categoryId);
+    const autoAmount = categoryId ? calculateExpenseAmount(categoryId) : '';
+    
     setExpenses([...expenses, {
-      category: '',
-      description: '',
-      expense_type: 'fixed',
-      estimated_amount: '',
+      category: categoryId,
+      description: cat?.description || '',
+      expense_type: cat?.type || 'fixed',
+      estimated_amount: autoAmount,
       actual_amount: '',
       remark: ''
     }]);
@@ -147,57 +201,99 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
   const updateExpense = (index, field, value) => {
     const updated = [...expenses];
     updated[index][field] = value;
+    
+    // Auto-calculate if category changed
+    if (field === 'category') {
+      const autoAmount = calculateExpenseAmount(value);
+      if (autoAmount) {
+        updated[index].estimated_amount = autoAmount;
+        const cat = expenseCategories.find(c => c.id === value);
+        updated[index].expense_type = cat?.type || 'fixed';
+        updated[index].description = cat?.description || '';
+      }
+    }
+    
     setExpenses(updated);
+  };
+
+  // Add all auto-calculated expenses
+  const addAutoExpenses = () => {
+    const autoCategories = expenseCategories.filter(c => c.type === 'percentage' || c.type === 'per_pax');
+    const newExpenses = [];
+    
+    autoCategories.forEach(cat => {
+      // Check if expense already exists
+      if (!expenses.some(e => e.category === cat.id)) {
+        const amount = calculateExpenseAmount(cat.id);
+        if (amount && parseFloat(amount) > 0) {
+          newExpenses.push({
+            category: cat.id,
+            description: cat.description || cat.name,
+            expense_type: cat.type,
+            estimated_amount: amount,
+            actual_amount: '',
+            remark: `Auto: ${cat.name}`
+          });
+        }
+      }
+    });
+    
+    if (newExpenses.length > 0) {
+      setExpenses([...expenses, ...newExpenses]);
+      toast.success(`Added ${newExpenses.length} auto-calculated expenses`);
+    } else {
+      toast.info('No new auto expenses to add');
+    }
   };
 
   const saveAll = async () => {
     setSaving(true);
     try {
-      // Save invoice/line items
+      const invoiceAmount = getInvoiceAmount();
+      const taxRate = parseFloat(invoiceData.tax_rate) || 0;
+      const taxAmount = invoiceAmount * taxRate / 100;
+      
+      // Save invoice
       const invoicePayload = {
         pricing_type: invoiceData.pricing_type,
         line_items: invoiceData.pricing_type === 'lumpsum' 
-          ? [{ description: 'Training Course Fee', quantity: 1, unit_price: parseFloat(invoiceData.lumpsum_amount) || 0, amount: parseFloat(invoiceData.lumpsum_amount) || 0 }]
-          : [{ description: 'Training Fee per Participant', quantity: costing?.pax || 0, unit_price: parseFloat(invoiceData.per_pax_rate) || 0, amount: (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0) }],
-        subtotal: invoiceData.pricing_type === 'lumpsum' 
-          ? parseFloat(invoiceData.lumpsum_amount) || 0 
-          : (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0),
-        tax_rate: parseFloat(invoiceData.tax_rate) || 0,
-        tax_amount: (invoiceData.pricing_type === 'lumpsum' 
-          ? parseFloat(invoiceData.lumpsum_amount) || 0 
-          : (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0)) * (parseFloat(invoiceData.tax_rate) || 0) / 100,
-        total_amount: invoiceData.pricing_type === 'lumpsum' 
-          ? parseFloat(invoiceData.lumpsum_amount) || 0 
-          : (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0)
+          ? [{ description: 'Training Course Fee', quantity: 1, unit_price: invoiceAmount, amount: invoiceAmount }]
+          : [{ description: 'Training Fee per Participant', quantity: costing?.pax || 0, unit_price: parseFloat(invoiceData.per_pax_rate) || 0, amount: invoiceAmount }],
+        subtotal: invoiceAmount,
+        tax_rate: taxRate,
+        tax_amount: taxAmount,
+        total_amount: invoiceAmount // Store gross amount (tax will be deducted in calculations)
       };
       
-      // Get invoice ID from session
-      const invoices = await axiosInstance.get('/finance/invoices');
-      const sessionInvoice = invoices.data.find(inv => inv.session_id === session.id);
-      if (sessionInvoice) {
-        await axiosInstance.put(`/finance/invoices/${sessionInvoice.id}`, invoicePayload);
+      if (invoiceId) {
+        await axiosInstance.put(`/finance/invoices/${invoiceId}`, invoicePayload);
       }
       
       // Save trainer fees
-      const validFees = trainerFees.filter(f => f.fee_amount);
+      const validFees = trainerFees.filter(f => f.fee_amount && parseFloat(f.fee_amount) > 0);
       if (validFees.length > 0) {
-        await axiosInstance.post(`/finance/session/${session.id}/trainer-fees`, validFees);
+        await axiosInstance.post(`/finance/session/${session.id}/trainer-fees`, validFees.map(f => ({
+          ...f,
+          fee_amount: parseFloat(f.fee_amount)
+        })));
       }
       
       // Save coordinator fee
       if (session.coordinator_id && coordinatorFee.num_days > 0) {
         await axiosInstance.post(`/finance/session/${session.id}/coordinator-fee`, {
           coordinator_id: session.coordinator_id,
-          num_days: coordinatorFee.num_days,
-          daily_rate: coordinatorFee.daily_rate
+          num_days: parseInt(coordinatorFee.num_days),
+          daily_rate: parseFloat(coordinatorFee.daily_rate)
         });
       }
       
       // Save expenses
       const validExpenses = expenses.filter(e => e.category && (e.estimated_amount || e.actual_amount));
-      if (validExpenses.length > 0) {
-        await axiosInstance.post(`/finance/session/${session.id}/expenses`, validExpenses);
-      }
+      await axiosInstance.post(`/finance/session/${session.id}/expenses`, validExpenses.map(e => ({
+        ...e,
+        estimated_amount: parseFloat(e.estimated_amount) || 0,
+        actual_amount: parseFloat(e.actual_amount) || 0
+      })));
       
       // Save marketing
       if (marketing.marketing_user_id || marketing.create_new) {
@@ -213,7 +309,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
       }
       
       toast.success('Costing saved successfully');
-      loadData(); // Refresh
+      await loadData(); // Refresh to show updated data
       if (onUpdate) onUpdate();
       
     } catch (error) {
@@ -225,15 +321,15 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
   };
 
   const calculateProfit = () => {
-    const invoiceTotal = invoiceData.pricing_type === 'lumpsum' 
-      ? parseFloat(invoiceData.lumpsum_amount) || 0 
-      : (costing?.pax || 0) * (parseFloat(invoiceData.per_pax_rate) || 0);
-    const taxAmount = invoiceTotal * (parseFloat(invoiceData.tax_rate) || 0) / 100;
+    const invoiceTotal = getInvoiceAmount();
+    const taxRate = parseFloat(invoiceData.tax_rate) || 0;
+    const taxAmount = invoiceTotal * taxRate / 100;
     const grossRevenue = invoiceTotal - taxAmount;
     
     const trainerTotal = trainerFees.reduce((sum, f) => sum + (parseFloat(f.fee_amount) || 0), 0);
-    const coordTotal = coordinatorFee.num_days * coordinatorFee.daily_rate;
-    const expensesTotal = expenses.reduce((sum, e) => sum + (parseFloat(e.actual_amount) || parseFloat(e.estimated_amount) || 0), 0);
+    const coordTotal = (parseInt(coordinatorFee.num_days) || 0) * (parseFloat(coordinatorFee.daily_rate) || 0);
+    const expensesTotal = expenses.reduce((sum, e) => 
+      sum + (parseFloat(e.actual_amount) || parseFloat(e.estimated_amount) || 0), 0);
     
     const profitBeforeMarketing = grossRevenue - trainerTotal - coordTotal - expensesTotal;
     
@@ -247,19 +343,31 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
     const finalProfit = profitBeforeMarketing - marketingAmount;
     const profitPct = grossRevenue > 0 ? (finalProfit / grossRevenue * 100) : 0;
     
-    return { invoiceTotal, taxAmount, grossRevenue, trainerTotal, coordTotal, expensesTotal, marketingAmount, finalProfit, profitPct };
+    return { 
+      invoiceTotal, taxAmount, taxRate, grossRevenue, 
+      trainerTotal, coordTotal, expensesTotal, 
+      profitBeforeMarketing, marketingAmount, finalProfit, profitPct 
+    };
   };
 
   if (loading) {
-    return <div className="p-8 text-center">Loading costing data...</div>;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8 text-center">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p>Loading costing data...</p>
+        </div>
+      </div>
+    );
   }
 
   const profit = calculateProfit();
+  const headcount = getTotalHeadcount();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+        <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
               <DollarSign className="w-6 h-6 text-green-600" />
@@ -284,6 +392,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                 <div><Building2 className="w-4 h-4 inline mr-1" /> {costing?.company_name}</div>
                 <div><Calendar className="w-4 h-4 inline mr-1" /> {costing?.training_dates}</div>
                 <div><Users className="w-4 h-4 inline mr-1" /> {costing?.pax} Participants</div>
+                <div><User className="w-4 h-4 inline mr-1" /> Total Headcount: {headcount}</div>
               </div>
             </CardContent>
           </Card>
@@ -342,6 +451,11 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                   placeholder="e.g. 6"
                 />
               </div>
+              {profit.invoiceTotal > 0 && (
+                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
+                  Invoice: RM {profit.invoiceTotal.toLocaleString()} | Tax ({profit.taxRate}%): RM {profit.taxAmount.toLocaleString()} | Gross Revenue: RM {profit.grossRevenue.toLocaleString()}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -427,7 +541,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                   </div>
                   <div className="pt-6">
                     <Badge className="bg-pink-100 text-pink-800">
-                      Total: RM {(coordinatorFee.num_days * coordinatorFee.daily_rate).toLocaleString()}
+                      Total: RM {((parseInt(coordinatorFee.num_days) || 0) * (parseFloat(coordinatorFee.daily_rate) || 0)).toLocaleString()}
                     </Badge>
                   </div>
                 </div>
@@ -444,55 +558,78 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                     <Truck className="w-5 h-5 text-orange-600" />
                     Training Expenses
                   </CardTitle>
-                  <CardDescription>Estimated and actual expenses</CardDescription>
+                  <CardDescription>
+                    Estimated and actual expenses • Total headcount: {headcount} (for F&B calc)
+                  </CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={addExpense}>
-                  <Plus className="w-4 h-4 mr-1" /> Add Expense
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={addAutoExpenses} disabled={profit.invoiceTotal === 0}>
+                    <Calculator className="w-4 h-4 mr-1" /> Auto-Add
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => addExpense()}>
+                    <Plus className="w-4 h-4 mr-1" /> Add Expense
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               {expenses.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No expenses added yet</p>
+                <div className="text-center py-4">
+                  <p className="text-gray-500 mb-2">No expenses added yet</p>
+                  <p className="text-xs text-gray-400">Click "Auto-Add" to add HRDCorp (4%), Wear & Tear (2%), Printing (1%), F&B (RM25/pax)</p>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {expenses.map((expense, index) => (
-                    <div key={index} className="grid grid-cols-6 gap-2 items-center p-3 bg-gray-50 rounded-lg">
-                      <Select value={expense.category} onValueChange={(v) => updateExpense(index, 'category', v)}>
-                        <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-                        <SelectContent>
-                          {expenseCategories.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input 
-                        value={expense.description || ''} 
-                        onChange={(e) => updateExpense(index, 'description', e.target.value)}
-                        placeholder="Description"
-                      />
-                      <Input 
-                        type="number"
-                        value={expense.estimated_amount || ''} 
-                        onChange={(e) => updateExpense(index, 'estimated_amount', e.target.value)}
-                        placeholder="Estimated (RM)"
-                      />
-                      <Input 
-                        type="number"
-                        value={expense.actual_amount || ''} 
-                        onChange={(e) => updateExpense(index, 'actual_amount', e.target.value)}
-                        placeholder="Actual (RM)"
-                      />
-                      <Input 
-                        value={expense.remark || ''} 
-                        onChange={(e) => updateExpense(index, 'remark', e.target.value)}
-                        placeholder="Remark"
-                      />
-                      <Button variant="ghost" size="sm" onClick={() => removeExpense(index)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    </div>
-                  ))}
+                  {expenses.map((expense, index) => {
+                    const cat = expenseCategories.find(c => c.id === expense.category);
+                    return (
+                      <div key={index} className="grid grid-cols-6 gap-2 items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="col-span-1">
+                          <Select value={expense.category} onValueChange={(v) => updateExpense(index, 'category', v)}>
+                            <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+                            <SelectContent>
+                              {expenseCategories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name} {cat.rate > 0 ? `(${cat.type === 'percentage' ? cat.rate + '%' : 'RM' + cat.rate + '/pax'})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Input 
+                          value={expense.description || ''} 
+                          onChange={(e) => updateExpense(index, 'description', e.target.value)}
+                          placeholder="Description"
+                        />
+                        <div>
+                          <Input 
+                            type="number"
+                            value={expense.estimated_amount || ''} 
+                            onChange={(e) => updateExpense(index, 'estimated_amount', e.target.value)}
+                            placeholder="Estimated (RM)"
+                            className={cat?.rate > 0 ? 'bg-yellow-50' : ''}
+                          />
+                          {cat?.rate > 0 && (
+                            <p className="text-xs text-yellow-600 mt-1">Auto-calculated</p>
+                          )}
+                        </div>
+                        <Input 
+                          type="number"
+                          value={expense.actual_amount || ''} 
+                          onChange={(e) => updateExpense(index, 'actual_amount', e.target.value)}
+                          placeholder="Actual (RM)"
+                        />
+                        <Input 
+                          value={expense.remark || ''} 
+                          onChange={(e) => updateExpense(index, 'remark', e.target.value)}
+                          placeholder="Remark"
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => removeExpense(index)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -539,7 +676,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                 </div>
               ) : (
                 <div>
-                  <Label>Select Marketing Person</Label>
+                  <Label>Select Marketing Person (from staff list)</Label>
                   <Select 
                     value={marketing.marketing_user_id || "none"} 
                     onValueChange={(v) => setMarketing({...marketing, marketing_user_id: v === "none" ? "" : v})}
@@ -548,10 +685,15 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {marketingUsers.map(user => (
-                        <SelectItem key={user.id} value={user.id}>{user.full_name}</SelectItem>
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.full_name} ({user.role}{user.additional_roles?.includes("marketing") ? " + Marketing" : ""})
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {marketingUsers.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">No staff available. Use "Create new" option.</p>
+                  )}
                 </div>
               )}
               
@@ -611,7 +753,7 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                   <p className="text-lg font-bold">RM {profit.invoiceTotal.toLocaleString()}</p>
                 </div>
                 <div className="p-3 bg-white rounded-lg">
-                  <p className="text-xs text-gray-500">Less Tax ({invoiceData.tax_rate || 0}%)</p>
+                  <p className="text-xs text-gray-500">Less Tax ({profit.taxRate}%)</p>
                   <p className="text-lg font-bold text-red-600">- RM {profit.taxAmount.toLocaleString()}</p>
                 </div>
                 <div className="p-3 bg-white rounded-lg">
@@ -636,7 +778,9 @@ const SessionCosting = ({ session, onClose, onUpdate }) => {
                 </div>
                 <div className="p-3 bg-green-100 rounded-lg border-2 border-green-400">
                   <p className="text-xs text-green-700 font-medium">NET PROFIT</p>
-                  <p className="text-2xl font-bold text-green-700">RM {profit.finalProfit.toLocaleString()}</p>
+                  <p className={`text-2xl font-bold ${profit.finalProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    RM {profit.finalProfit.toLocaleString()}
+                  </p>
                   <p className="text-xs text-green-600">{profit.profitPct.toFixed(1)}% margin</p>
                 </div>
               </div>
