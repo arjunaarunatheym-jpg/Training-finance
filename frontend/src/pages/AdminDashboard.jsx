@@ -89,6 +89,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     program_id: "",
     company_id: "",
     location: "",
+    venue_type: "client", // "mddrc" or "client" - affects F&B charges
     start_date: "",
     end_date: "",
     participants: [], // Participants to create/link
@@ -100,6 +101,9 @@ const AdminDashboard = ({ user, onLogout }) => {
     commission_type: "percentage",
     commission_rate: "",
     commission_fixed_amount: "",
+    create_new_marketing: false, // Flag to create new marketing person
+    new_marketing_name: "",
+    new_marketing_id: "",
   });
   const [newParticipant, setNewParticipant] = useState({
     email: "",
