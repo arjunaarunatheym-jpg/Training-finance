@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://finance-portal-132.preview.emergentagent.com/api"
+BASE_URL = "https://payflow-dash-3.preview.emergentagent.com/api"
 COORDINATOR_EMAIL = "malek@mddrc.com.my"
 COORDINATOR_PASSWORD = "mddrc1"
 

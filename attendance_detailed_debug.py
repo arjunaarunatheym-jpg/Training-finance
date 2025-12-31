@@ -7,7 +7,7 @@ import requests
 import json
 from datetime import datetime
 
-BASE_URL = "https://finance-portal-132.preview.emergentagent.com/api"
+BASE_URL = "https://payflow-dash-3.preview.emergentagent.com/api"
 
 def detailed_debug():
     session = requests.Session()

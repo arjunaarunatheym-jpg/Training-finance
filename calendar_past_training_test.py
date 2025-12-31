@@ -19,7 +19,7 @@ import sys
 from datetime import datetime, date, timedelta
 
 # Configuration
-BASE_URL = "https://finance-portal-132.preview.emergentagent.com/api"
+BASE_URL = "https://payflow-dash-3.preview.emergentagent.com/api"
 
 class CalendarPastTrainingTestRunner:
     def __init__(self):
